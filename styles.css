@@ -1,6 +1,6 @@
-/* ───────── Tokens: cuaderno sobre fondo rosa suave ───────── */
+/* ───────── Tokens: cuaderno sobre fondo casi blanco ───────── */
 :root {
-  --desk: #ead0cb;
+  --desk: #f8f3f2;
   --page: #ebe5d8;
   --page-2: #e0d8c7;
   --rule: rgba(60, 70, 90, .16);
@@ -34,7 +34,7 @@ body {
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
 }
-/* fondo rosa casi liso: un degradé suave y una luz arriba */
+/* fondo casi blanco, con un leve tono cálido */
 body::before, body::after {
   content: "";
   position: fixed;
@@ -43,10 +43,10 @@ body::before, body::after {
   z-index: 0;
 }
 body::before {
-  background: linear-gradient(170deg, #f0d9d4, #e8cbc5 55%, #e2c0ba);
+  background: linear-gradient(170deg, #fdfbfa, #f8f2f1 55%, #f3ebea);
 }
 body::after {
-  background: radial-gradient(90% 60% at 50% 25%, rgba(255, 250, 248, .45), transparent 65%);
+  background: radial-gradient(90% 60% at 50% 25%, rgba(255, 255, 255, .6), transparent 65%);
 }
 
 [hidden] { display: none !important; }
