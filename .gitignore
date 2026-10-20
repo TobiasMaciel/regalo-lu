@@ -1,0 +1,3 @@
+# Nunca publicar: contiene el regalo en texto plano, la carta y el QR
+privado/
+node_modules/

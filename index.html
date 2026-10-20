@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#e8ddcb">
+  <title>Para Lu</title>
+  <meta name="description" content="Una carta con un secreto adentro.">
+  <meta property="og:title" content="Para Lu ✉️">
+  <meta property="og:description" content="Una carta con un secreto adentro.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
+
+  <main>
+    <!-- 1. Candado -->
+    <section class="screen screen--lock" id="lock" aria-labelledby="lock-title">
+      <div class="envelope" id="envelope" aria-hidden="true">
+        <div class="envelope__back"></div>
+        <div class="envelope__paper"></div>
+        <div class="envelope__front"></div>
+        <div class="envelope__flap"></div>
+        <div class="seal"><span>L</span></div>
+      </div>
+
+      <h1 class="lock__title" id="lock-title">Para Lu</h1>
+      <p class="lock__hint">Escondí una palabra en la carta.<br>Las letras que brillan te van a guiar.</p>
+
+      <form class="code" id="code-form" novalidate>
+        <label class="sr-only" for="code-input">Palabra secreta</label>
+        <div class="code__field">
+          <div class="code__tiles" id="code-tiles" aria-hidden="true"></div>
+          <input class="code__input" id="code-input" type="text" inputmode="text" maxlength="6"
+                 autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false"
+                 enterkeyhint="go">
+        </div>
+        <button class="btn btn--ink" id="code-submit" type="submit">Abrir la carta</button>
+        <p class="code__msg" id="code-msg" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <!-- 2. La carta -->
+    <section class="screen screen--letter" id="letter" hidden>
+      <article class="paper" id="paper">
+        <p class="paper__date" id="paper-date"></p>
+        <p class="paper__greeting" id="paper-greeting"></p>
+        <div class="paper__lines" id="intro-lines" aria-live="polite"></div>
+      </article>
+      <button class="btn btn--ghost letter__next" id="intro-next" type="button" disabled>Seguir</button>
+    </section>
+
+    <!-- 3. El regalo -->
+    <section class="screen screen--gift" id="gift" hidden>
+      <p class="eyebrow" id="gift-eyebrow">Algo para vos</p>
+      <div class="ticket-shadow" id="ticket-shadow">
+        <div class="ticket-wrap">
+          <div class="ticket" id="ticket"></div>
+          <canvas class="scratch" id="scratch" aria-hidden="true"></canvas>
+        </div>
+      </div>
+      <button class="link-btn" id="scratch-skip" type="button" hidden>¿No te deja rascar? Tocá acá</button>
+      <div class="gift__rest" id="gift-rest"></div>
+    </section>
+  </main>
+</body>
+</html>
