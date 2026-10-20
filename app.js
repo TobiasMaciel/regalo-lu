@@ -175,8 +175,9 @@ function initLock() {
       vibrate(30);
       store.set({ gift, key, revealed: false, answered: false });
       loadPhotosScript().catch(() => {}); // precarga mientras lee la carta
-      $("#envelope").classList.add("is-open");
-      await sleep(1700);
+      await sleep(350);
+      $("#lock-page").classList.add("is-turning"); // se da vuelta la hoja del cuaderno
+      await sleep(1000);
       await playLetter(gift, key);
     } catch (err) {
       if (err instanceof NetworkError) {
@@ -347,7 +348,7 @@ async function setupScratch(canvas, onDone) {
   }
   ctx.textAlign = "center";
   ctx.fillStyle = "rgba(74, 50, 14, .82)";
-  ctx.font = `italic 600 ${Math.round(Math.min(w / 8, 46))}px Fraunces, Georgia, serif`;
+  ctx.font = `400 ${Math.round(Math.min(w / 6.5, 58))}px "Shadows Into Light", "Segoe Print", cursive`;
   ctx.fillText("Rascá acá", w / 2, h / 2 - 8);
   ctx.font = `500 12px "IBM Plex Mono", ui-monospace, monospace`;
   ctx.fillStyle = "rgba(74, 50, 14, .6)";
@@ -419,7 +420,7 @@ async function setupScratch(canvas, onDone) {
 const confetti = (() => {
   const canvas = $("#confetti");
   const ctx = canvas.getContext("2d");
-  const COLORS = ["#9b2c2c", "#c99a45", "#e9cd8f", "#1f2543", "#e7a3a6", "#fbf6ec"];
+  const COLORS = ["#a11d1d", "#e2675d", "#c99a45", "#e9cd8f", "#ebe5d8", "#fbf6ec"];
   let parts = [];
   let raf = 0;
 
@@ -638,7 +639,7 @@ function buildAfter(gift, key) {
       el("h3", { class: "card__title", text: "Faltan" }),
       countdown(s.inicio)),
     el("div", { class: "actions" },
-      el("a", { class: "btn btn--ink", href: s.mapsUrl, target: "_blank", rel: "noopener", html: `${ICON.pin}<span>Cómo llegar</span>` }),
+      el("a", { class: "btn btn--light", href: s.mapsUrl, target: "_blank", rel: "noopener", html: `${ICON.pin}<span>Cómo llegar</span>` }),
       el("button", { class: "btn btn--ghost", type: "button", html: `${ICON.cal}<span>Agendar</span>`, onclick: () => addToCalendar(gift) })),
     el("section", { class: "card" },
       el("h3", { class: "card__title", text: "Para ir escuchando" }),
