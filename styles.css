@@ -183,7 +183,7 @@ body::after {
   transform-origin: left center;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  transition: transform 1.15s cubic-bezier(.45, 0, .25, 1), box-shadow 1.15s;
+  transition: transform 1.15s cubic-bezier(.45, 0, .25, 1);
 }
 .page.is-bottom {
   /* las hojas de abajo asoman un poco: se nota que es un cuaderno */
@@ -199,7 +199,10 @@ body::after {
   pointer-events: none;
 }
 .page.is-turning, .page.is-dragging { box-shadow: 30px 0 40px -20px rgba(0, 0, 0, .35); }
-.page.is-gone { visibility: hidden; }
+.page.is-gone, .page.is-culled { visibility: hidden; }
+/* intentar pasar una hoja que todavía no se terminó: rebote */
+.page.is-locked { animation: locked .5s var(--ease-out); }
+@keyframes locked { 30% { transform: perspective(1500px) rotateY(-9deg); } 60% { transform: perspective(1500px) rotateY(-2deg); } }
 
 /* sombra que recorre la hoja mientras se dobla (--shade desde JS al arrastrar) */
 .page::after {
@@ -1069,17 +1072,17 @@ body::after {
 }
 .detail__heart span {
   display: block;
-  font-size: 21px;
+  font-size: 17px;
   line-height: 34px;
-  color: #d9407a;
-  opacity: 1;
+  color: #e0548c;
+  opacity: .92;
   transform: rotate(-14deg);
-  text-shadow: 0 0 1px #fff, 0 0 2px #fff, 0 0 6px rgba(255, 255, 255, .8);
-  animation: twinkle 4s 1.5s ease-in-out infinite;
+  text-shadow: 0 0 1px rgba(255, 255, 255, .85);
+  animation: twinkle 7s 3s ease-in-out infinite;
   transition: transform .6s var(--ease-spring), opacity .4s, color .4s;
 }
 .detail__heart.is-hinting span { animation: heart-hint 1.6s ease-in-out infinite; }
-@keyframes twinkle { 0%, 82%, 100% { transform: rotate(-14deg) scale(1); } 90% { transform: rotate(-14deg) scale(1.35); filter: brightness(1.25); } }
+@keyframes twinkle { 0%, 88%, 100% { transform: rotate(-14deg) scale(1); } 94% { transform: rotate(-14deg) scale(1.18); filter: brightness(1.12); } }
 @keyframes heart-hint { 50% { transform: rotate(-14deg) scale(1.6); opacity: 1; } }
 .detail__heart.is-found span {
   animation: none;
@@ -1253,16 +1256,17 @@ body::after {
 
 /* ───────── ¿Qué creés que es? ───────── */
 .page--guess .page__body { justify-content: center; text-align: center; }
-.guess__opts { display: grid; gap: 10px; margin-top: 24px; }
+.guess__opts { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 22px; }
 .guess__opt {
   appearance: none;
   width: 100%;
-  padding: 13px 16px;
+  min-height: 54px;
+  padding: 9px 10px;
   border: 0;
   border-radius: 14px;
   background: rgba(255, 255, 255, .5);
   box-shadow: inset 0 0 0 1.5px rgba(36, 35, 34, .16), 0 6px 14px -12px rgba(0, 0, 0, .5);
-  font: 400 18px/1.25 var(--serif);
+  font: 400 15.5px/1.2 var(--serif);
   color: var(--ink);
   cursor: pointer;
   transition: background .25s, box-shadow .25s, transform .2s, opacity .3s;
@@ -1274,8 +1278,10 @@ body::after {
 .guess__opt:nth-child(3) { --n: 2; }
 .guess__opt:nth-child(4) { --n: 3; }
 .guess__opt:nth-child(5) { --n: 4; }
-.guess__opt.is-wrong { opacity: .45; text-decoration: line-through; animation: shake .45s; }
-.guess__opt.is-right { background: var(--pen); color: #fff6f8; box-shadow: none; opacity: 1; animation: pop .45s var(--ease-spring); }
+.guess__opt:nth-child(6) { --n: 5; }
+.guess__opt:nth-child(7) { --n: 6; }
+.guess__opt:nth-child(8) { --n: 7; }
+.guess__opt.is-picked { opacity: .5; animation: pop .4s var(--ease-spring); }
 @keyframes pop { 50% { transform: scale(1.05); } }
 .guess__reply {
   min-height: 1.4em;
@@ -1302,6 +1308,14 @@ body::after {
 }
 .page--note.is-signed .note__sign { opacity: 1; transform: none; }
 .doodle--note { right: 40px; bottom: 120px; width: 40px; height: 40px; transform: rotate(10deg); }
+
+/* ───────── En el celular: sin efectos pesados (evita parpadeos) ───────── */
+@media (hover: none) {
+  /* el cuaderno solo se escala: sin perspectiva permanente (en Safari hace parpadear las hojas) */
+  .book { transform: scale(var(--fit, 1)); transition: none; }
+  /* las luces del fondo quedan quietas */
+  body::after { animation: none; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

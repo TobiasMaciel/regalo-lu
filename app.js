@@ -83,10 +83,16 @@ function loadPhotosScript() {
 async function decryptPhotos(keyB64) {
   await loadPhotosScript();
   const key = await crypto.subtle.importKey("raw", fromB64(keyB64), "AES-GCM", false, ["decrypt"]);
-  // si una foto falla, las demás se muestran igual (esa queda en null)
+  const open = async (part, type) => {
+    const buf = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(part.iv) }, key, fromB64(part.data));
+    return URL.createObjectURL(new Blob([buf], { type }));
+  };
+  // Las polaroids usan una versión liviana; la grande se descifra recién cuando hace falta (visor).
+  // Si una foto falla, las demás se muestran igual (esa queda en null).
   const results = await Promise.allSettled((window.FOTOS_ENC || []).map(async (f) => {
-    const buf = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(f.iv) }, key, fromB64(f.data));
-    return { url: URL.createObjectURL(new Blob([buf], { type: f.type })), w: f.w, h: f.h };
+    const url = await open(f.thumb ?? f, f.type);
+    let full = null;
+    return { url, w: f.w, h: f.h, full: () => (full ??= f.thumb ? open(f, f.type) : Promise.resolve(url)) };
   }));
   return results.map((r) => (r.status === "fulfilled" ? r.value : null));
 }
@@ -137,6 +143,13 @@ function setCurrent(i) {
     if (j === i) p.el.classList.add("is-current");
     else if (p.el.classList.contains("is-current")) p.el.classList.replace("is-current", "is-seen");
   });
+}
+
+// Solo se dibujan la hoja de arriba y la siguiente (y la última, que hace de canto del cuaderno):
+// las demás están tapadas, y dibujarlas igual hace que el celular se quede sin memoria y parpadee.
+function cull(i) {
+  const last = book.pages.length - 1;
+  book.pages.forEach((p, j) => p.el.classList.toggle("is-culled", j > i + 1 && j !== last));
 }
 
 // El cuaderno tiene tamaño fijo de diseño y se escala para entrar entero en la pantalla
@@ -209,8 +222,9 @@ async function turnTo(target, { from } = {}) {
   const { pages } = book;
   if (book.busy || target < 0 || target >= pages.length || target === book.index) return;
   const forward = target > book.index;
-  if (forward && !pages[book.index].ready) return;
+  if (forward && !pages[book.index].ready) return nudgeLocked();
   book.busy = true;
+  cull(Math.min(book.index, target));
   setCurrent(target);
   paperSound.play();
   vibrate(8);
@@ -220,14 +234,27 @@ async function turnTo(target, { from } = {}) {
   const ms = from == null ? TURN_MS : Math.max(260, Math.abs(end - start) * TURN_MS);
   await animateTurn(page, start, end, ms, from == null);
   book.index = target;
+  cull(target);
   book.busy = false;
   save({ page: target });
   pages[target].onEnter?.();
 }
 
+// Si todavía no se puede pasar (falta resolver la hoja), la hoja hace un rebote en vez de no hacer nada
+function nudgeLocked() {
+  const page = book.pages[book.index]?.el;
+  if (!page) return;
+  page.classList.remove("is-locked");
+  void page.offsetWidth;
+  page.classList.add("is-locked");
+  vibrate([20, 30, 20]);
+}
+
 // Arrastrar la hoja con el dedo: sigue al dedo en 3D y al soltar termina de girar o vuelve
 (() => {
-  const NO_DRAG = "button, a, input, .scratch, .glued, .question__actions, .code, .code__field, .detail__photo, dialog";
+  // se puede arrastrar desde cualquier lado (fotos y botones incluidos: si fue arrastre, el toque no cuenta),
+  // salvo donde el dedo ya hace otra cosa: raspar, escribir o perseguir al "No"
+  const NO_DRAG = "input, .scratch, .btn--no, dialog";
   const clamp = (v) => Math.min(1, Math.max(0, v));
   let d = null;
   let draggedAt = -1e9; // el "click" que el navegador dispara al soltar un arrastre no debe contar como toque
@@ -246,7 +273,8 @@ async function turnTo(target, { from } = {}) {
       if (Math.abs(dx) < 10) return;
       const i = book.index;
       const forward = dx < 0;
-      if (forward ? i >= book.pages.length - 1 || !book.pages[i].ready : i === 0) { d = null; return; }
+      if (forward && i < book.pages.length - 1 && !book.pages[i].ready) { d = null; nudgeLocked(); return; }
+      if (forward ? i >= book.pages.length - 1 : i === 0) { d = null; return; }
       // ancho en pantalla (ya escalado), para que la hoja siga al dedo 1 a 1
       Object.assign(d, { active: true, forward, page: (forward ? book.pages[i] : book.pages[i - 1]).el, width: bookEl.offsetWidth * fitScale });
       book.busy = true;
@@ -283,6 +311,9 @@ async function turnTo(target, { from } = {}) {
   };
   bookEl.addEventListener("pointerup", end);
   bookEl.addEventListener("pointercancel", end);
+  // si el celular pierde el toque a mitad del gesto, la hoja no queda trabada
+  // (solo cuando la pierde el cuaderno: al capturarla, el elemento tocado también "la pierde" y eso es normal)
+  bookEl.addEventListener("lostpointercapture", (e) => { if (e.target === bookEl) end(e); });
   bookEl.addEventListener("click", (e) => {
     if (performance.now() - draggedAt > 350) return;
     e.preventDefault();
@@ -379,6 +410,7 @@ function buildBook(gift, restoring) {
   bookEl.querySelectorAll(".page").forEach((p) => p.classList.toggle("is-bottom", p === above));
   book.pages = pages;
   refreshNav();
+  cull(0);
   photos.load(state.key);
   return pages;
 }
@@ -1119,6 +1151,7 @@ function detailPage(gift, photos) {
     photo.style.aspectRatio = `${p.w} / ${p.h}`;
     img.src = p.url;
     photo.classList.remove("is-loading");
+    p.full().then((u) => { img.src = u; }).catch(() => {}); // acá hace falta nitidez para buscar el corazón
   });
 
   const found = () => {
@@ -1174,40 +1207,24 @@ function guessPage(gift) {
   page.el.append(doodle("star", "doodle--guess"), doodle("sparkle", "doodle--guess-b"));
 
   const right = cfg.opciones.findIndex((o) => o.correcta);
-  const solve = (animate) => {
-    buttons.forEach((b, i) => {
-      b.disabled = true;
-      if (i === right) b.classList.add("is-right");
-    });
-    reply.textContent = cfg.opciones[right]?.respuesta ?? "";
-    reply.classList.toggle("is-right", true);
-    if (!animate) return;
-    const r = buttons[right].getBoundingClientRect();
-    confetti.burst(r.left + r.width / 2, r.top, 90);
-    vibrate([30, 40, 60]);
-  };
-  if (state.adivinanza) {
-    solve(false);
-    return page;
-  }
+  if (state.adivinanza) return page;
 
   page.ready = false;
+  // todas las opciones se comportan igual (la buena no se marca): cada una tiene su comentario en joda
+  // y, cuando toca la buena, simplemente aparece "Seguir"
   buttons.forEach((b, i) => b.addEventListener("click", () => {
-    if (b.disabled) return;
-    if (i === right) {
-      save({ adivinanza: true });
-      solve(true);
-      setReady(page);
-      return;
-    }
-    // respuesta en joda: la opción tiembla, se tacha y aparece el comentario
-    b.classList.add("is-wrong");
-    b.disabled = true;
-    reply.classList.remove("is-shown", "is-right");
+    b.classList.remove("is-picked");
+    void b.offsetWidth;
+    b.classList.add("is-picked");
+    reply.classList.remove("is-shown");
     void reply.offsetWidth;
     reply.textContent = cfg.opciones[i].respuesta;
     reply.classList.add("is-shown");
-    vibrate([40, 30, 40]);
+    vibrate(20);
+    if (i === right && !state.adivinanza) {
+      save({ adivinanza: true });
+      setReady(page);
+    }
   }));
   return page;
 }
@@ -1379,7 +1396,9 @@ function openViewer(photos, captions, start) {
 
   const show = (n, dir = 0) => {
     i = (n + photos.length) % photos.length;
+    const shown = i;
     img.src = photos[i].url;
+    photos[i].full().then((u) => { if (i === shown) img.src = u; }).catch(() => {});
     img.alt = captions[i];
     caption.textContent = captions[i];
     caption.hidden = !captions[i];
@@ -1523,6 +1542,7 @@ if (saved?.gift) {
   const at = Math.min(state.page || 0, pages.length - 1);
   pages.slice(0, at).forEach((p) => p.el.classList.add("is-turned", "is-gone", "is-seen"));
   book.index = at;
+  cull(at);
   setCurrent(at);
   pages[at].onEnter?.();
 } else {

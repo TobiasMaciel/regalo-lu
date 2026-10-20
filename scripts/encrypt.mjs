@@ -71,8 +71,10 @@ for (const f of fotos) {
     .resize({ width: 1200, height: 1200, fit: "inside", withoutEnlargement: true })
     .webp({ quality: 76 })
     .toBuffer({ resolveWithObject: true });
-  total += data.length;
-  sealedPhotos.push({ w: info.width, h: info.height, type: "image/webp", ...(await seal(data)) });
+  // versión liviana para las polaroids (en el celular, muchas fotos grandes a la vez hacen que parpadee)
+  const thumb = await sharp(photoPath(f.archivo)).rotate().resize({ width: 520, height: 520, fit: "inside", withoutEnlargement: true }).webp({ quality: 74 }).toBuffer();
+  total += data.length + thumb.length;
+  sealedPhotos.push({ w: info.width, h: info.height, type: "image/webp", ...(await seal(data)), thumb: await seal(thumb) });
 }
 // Scripts clásicos (no JSON + fetch) para que la página también funcione abierta como archivo local
 const fotosJs = `window.FOTOS_ENC = ${JSON.stringify(sealedPhotos)};\n`;
