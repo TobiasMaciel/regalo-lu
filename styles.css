@@ -379,6 +379,10 @@ body::after {
     radial-gradient(circle var(--notch) at right calc(100% - var(--stub)), #0000 97%, #000);
   mask-composite: intersect;
 }
+/* hasta que la lámina está pintada, la entrada no se ve */
+.ticket-wrap.is-covered { background: linear-gradient(135deg, #b48c3c, #ead199 30%, #c49b4b 55%, #f0dcaa 80%, #a88130); }
+.ticket-wrap.is-covered .ticket { visibility: hidden; }
+
 .scratch {
   position: absolute;
   inset: 0;

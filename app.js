@@ -82,10 +82,10 @@ async function go(fromId, toId) {
 /* ───────── 1. Candado ───────── */
 
 const NOPE = [
-  "Mmm, esa no es. Volvé a mirar la carta 👀",
-  "Casi… las letras que brillan van en orden ✨",
-  "Leela despacito, está escondida a simple vista",
-  "Pista: son seis letras, de arriba hacia abajo 💌",
+  "No es esa. Mirá la carta de nuevo.",
+  "Tampoco. Las letras van en orden.",
+  "Seguí buscando.",
+  "Son seis letras, en el orden en que aparecen.",
 ];
 
 function initLock() {
@@ -159,7 +159,7 @@ function initLock() {
       await playLetter(gift);
     } catch (err) {
       if (err instanceof NetworkError) {
-        fail("No pude cargar la carta. Revisá la conexión y probá de nuevo 🙏", false);
+        fail("No se pudo cargar. Probá de nuevo en un rato.", false);
       } else {
         fail(NOPE[attempts++ % NOPE.length], true);
       }
@@ -507,8 +507,11 @@ function showGift(gift, state) {
   }
 
   eyebrow.textContent = "Algo para vos";
+  const wrap = ticket.parentElement;
+  wrap.classList.add("is-covered");
   requestAnimationFrame(async () => {
     const finish = await setupScratch(canvas, () => onRevealed(false));
+    wrap.classList.remove("is-covered");
     setTimeout(() => {
       if (!state.revealed) skip.hidden = false;
     }, 9000);
@@ -558,7 +561,7 @@ function showQuestion(gift, state, save, instant) {
     escapes++;
     if (escapes >= 5) {
       no.dataset.surrender = "1";
-      no.textContent = "Bueno, sí 🙈";
+      no.textContent = "Bueno, dale";
       no.classList.replace("btn--ghost", "btn--wax");
       return;
     }
@@ -617,7 +620,7 @@ function buildAfter(gift) {
       el("a", { class: "btn btn--ink", href: s.mapsUrl, target: "_blank", rel: "noopener", html: `${ICON.pin}<span>Cómo llegar</span>` }),
       el("button", { class: "btn btn--ghost", type: "button", html: `${ICON.cal}<span>Agendar</span>`, onclick: () => addToCalendar(gift) })),
     el("section", { class: "card" },
-      el("h3", { class: "card__title", text: "Para ir calentando la voz" }),
+      el("h3", { class: "card__title", text: "Para ir escuchando" }),
       el("ol", { class: "setlist" },
         gift.canciones.map((song, i) => el("li", {},
           el("a", { href: `https://open.spotify.com/search/${encodeURIComponent(`${s.artista} ${song}`)}`, target: "_blank", rel: "noopener" },
@@ -639,7 +642,7 @@ function countdown(iso) {
     const d = target - Date.now();
     if (d <= 0) {
       clearInterval(timer);
-      const text = d > -6 * 3600e3 ? "¡Es hoy! Nos vemos en el campo ✨" : "Ya la vivimos. ¿Cuándo la próxima?";
+      const text = d > -6 * 3600e3 ? "Es hoy." : "Ya fue.";
       box.replaceWith(el("p", { class: "countdown__done", text }));
       return;
     }
@@ -680,7 +683,7 @@ function addToCalendar(gift) {
     `SUMMARY:${esc(title)}`,
     `LOCATION:${esc(where)}`,
     `DESCRIPTION:${esc(details)}`,
-    "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Mañana es la noche ✨", "TRIGGER:-P1D", "END:VALARM",
+    "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Mañana es el show", "TRIGGER:-P1D", "END:VALARM",
     "END:VEVENT", "END:VCALENDAR",
   ].join("\r\n");
   const link = el("a", { href: URL.createObjectURL(new Blob([ics], { type: "text/calendar" })), download: "show.ics" });
