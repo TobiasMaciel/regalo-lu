@@ -97,11 +97,14 @@ function makePage(cls, label) {
   const prev = el("button", { class: "page__turn page__turn--prev", type: "button", text: "‹ Volver" });
   const next = el("button", { class: "page__turn page__turn--next", type: "button", text: "Seguir ›" });
   const num = el("span", { class: "page__num" });
+  // esquina doblada: se levanta sola cuando se puede pasar de hoja
+  const corner = el("button", { class: "page__corner is-off", type: "button", "aria-label": "Pasar la hoja" });
   const section = el("section", { class: `notebook page ${cls}`, "aria-label": label },
-    body, el("footer", { class: "page__foot" }, prev, num, next));
+    body, el("footer", { class: "page__foot" }, prev, num, next), corner);
   prev.addEventListener("click", () => turnTo(book.index - 1));
   next.addEventListener("click", () => turnTo(book.index + 1));
-  return { el: section, body, prev, next, num, ready: true, onEnter: null };
+  corner.addEventListener("click", () => turnTo(book.index + 1));
+  return { el: section, body, prev, next, num, corner, ready: true, onEnter: null };
 }
 
 function refreshNav() {
@@ -109,7 +112,9 @@ function refreshNav() {
   book.pages.forEach((p, i) => {
     p.num.textContent = String(i + 1);
     p.prev.classList.toggle("is-off", i === 0);
-    p.next.classList.toggle("is-off", i === last || !p.ready);
+    const blocked = i === last || !p.ready;
+    p.next.classList.toggle("is-off", blocked);
+    p.corner.classList.toggle("is-off", blocked);
   });
 }
 
@@ -118,61 +123,181 @@ function setReady(page) {
   page.ready = true;
   refreshNav();
   page.next.classList.add("is-new");
+  page.corner.classList.add("is-new");
 }
 
-async function turnTo(target) {
+// la hoja que queda arriba reproduce su animación de llegada (polaroids que se pegan, etc.)
+function setCurrent(i) {
+  book.pages.forEach((p, j) => p.el.classList.toggle("is-current", j === i));
+}
+
+/* Giro de hoja: 0 = abierta, 1 = dada vuelta sobre la espiral.
+   Las hojas giradas siguen ocupando su lugar (solo se vuelven invisibles)
+   para que el cuaderno no cambie de tamaño. */
+const ROT = (p) => `perspective(2200px) rotateY(${(-180 * p).toFixed(2)}deg)`;
+
+async function animateTurn(page, from, to, ms = TURN_MS, shade = true) {
+  page.classList.remove("is-gone");
+  page.style.transition = "none";
+  page.style.transform = ROT(from);
+  void page.offsetWidth;
+  page.style.setProperty("--turn-ms", `${ms}ms`);
+  page.style.transition = `transform ${ms}ms cubic-bezier(.45, 0, .25, 1)`;
+  page.classList.add("is-turning");
+  if (shade) page.classList.add("is-flipping");
+  page.style.transform = ROT(to);
+  await sleep(ms);
+  page.classList.remove("is-turning", "is-flipping");
+  page.style.transition = "none";
+  page.classList.toggle("is-turned", to === 1);
+  page.style.transform = "";
+  page.style.removeProperty("--shade");
+  void page.offsetWidth;
+  page.style.transition = "";
+  if (to === 1) page.classList.add("is-gone");
+}
+
+const turnAway = (page) => animateTurn(page, 0, 1);
+
+async function turnTo(target, { from } = {}) {
   const { pages } = book;
   if (book.busy || target < 0 || target >= pages.length || target === book.index) return;
-  if (target > book.index && !pages[book.index].ready) return;
+  const forward = target > book.index;
+  if (forward && !pages[book.index].ready) return;
   book.busy = true;
-  if (target > book.index) {
-    await turnAway(pages[book.index].el);
-  } else {
-    const page = pages[target].el;
-    page.classList.remove("is-gone");
-    void page.offsetWidth; // que arranque girada para animar la vuelta
-    page.classList.add("is-turning");
-    page.classList.remove("is-turned");
-    await sleep(TURN_MS);
-    page.classList.remove("is-turning");
-  }
+  setCurrent(target);
+  paperSound.play();
+  vibrate(8);
+  const page = forward ? pages[book.index].el : pages[target].el;
+  const start = from ?? (forward ? 0 : 1);
+  const end = forward ? 1 : 0;
+  const ms = from == null ? TURN_MS : Math.max(260, Math.abs(end - start) * TURN_MS);
+  await animateTurn(page, start, end, ms, from == null);
   book.index = target;
   book.busy = false;
   save({ page: target });
   pages[target].onEnter?.();
 }
 
-// La hoja gira sobre la espiral y deja ver la que ya estaba abajo.
-// Sigue ocupando su lugar (solo se vuelve invisible) para que el cuaderno no cambie de tamaño.
-async function turnAway(page) {
-  page.classList.add("is-turning", "is-turned");
-  await sleep(TURN_MS);
-  page.classList.remove("is-turning");
-  page.classList.add("is-gone");
-}
-
-// deslizar para pasar de hoja; si fue un deslizamiento, no cuenta como toque
+// Arrastrar la hoja con el dedo: sigue al dedo en 3D y al soltar termina de girar o vuelve
 (() => {
-  let x0 = null;
-  let swiped = false;
+  const NO_DRAG = "button, a, input, .scratch, .glued, .question__actions, .code, dialog";
+  const clamp = (v) => Math.min(1, Math.max(0, v));
+  let d = null;
+  let suppressClick = false;
+
   bookEl.addEventListener("pointerdown", (e) => {
-    x0 = book.pages.length && !e.target.closest(".scratch, .question__actions, .code") ? e.clientX : null;
+    if (book.busy || !book.pages.length || e.button > 0 || e.target.closest(NO_DRAG)) return;
+    d = { x0: e.clientX, y0: e.clientY, id: e.pointerId, active: false };
   });
-  bookEl.addEventListener("pointerup", (e) => {
-    if (x0 == null) return;
-    const dx = e.clientX - x0;
-    x0 = null;
-    if (Math.abs(dx) > 60) {
-      swiped = true;
-      turnTo(book.index + (dx < 0 ? 1 : -1));
+
+  bookEl.addEventListener("pointermove", (e) => {
+    if (!d || e.pointerId !== d.id) return;
+    const dx = e.clientX - d.x0;
+    const dy = e.clientY - d.y0;
+    if (!d.active) {
+      if (Math.abs(dy) > 14 && Math.abs(dy) > Math.abs(dx)) { d = null; return; } // está scrolleando
+      if (Math.abs(dx) < 10) return;
+      const i = book.index;
+      const forward = dx < 0;
+      if (forward ? i >= book.pages.length - 1 || !book.pages[i].ready : i === 0) { d = null; return; }
+      Object.assign(d, { active: true, forward, page: (forward ? book.pages[i] : book.pages[i - 1]).el, width: bookEl.offsetWidth });
+      book.busy = true;
+      d.page.classList.remove("is-gone");
+      d.page.classList.add("is-dragging");
+      d.page.style.transition = "none";
+      setCurrent(forward ? i + 1 : i - 1);
+      try { bookEl.setPointerCapture(e.pointerId); } catch {}
     }
+    d.p = d.forward ? clamp(-dx / d.width) : clamp(1 - dx / d.width);
+    d.page.style.transform = ROT(d.p);
+    d.page.style.setProperty("--shade", Math.sin(Math.PI * d.p).toFixed(3));
   });
+
+  const end = async (e) => {
+    if (!d || e.pointerId !== d.id) return;
+    const drag = d;
+    d = null;
+    if (!drag.active || drag.p == null) { book.busy = false; return; }
+    suppressClick = true;
+    drag.page.classList.remove("is-dragging");
+    const i = book.index;
+    const done = drag.forward ? drag.p > .28 : drag.p < .72;
+    book.busy = false;
+    if (done) {
+      await turnTo(drag.forward ? i + 1 : i - 1, { from: drag.p });
+    } else {
+      setCurrent(i);
+      book.busy = true;
+      const back = drag.forward ? 0 : 1;
+      await animateTurn(drag.page, drag.p, back, Math.max(220, Math.abs(back - drag.p) * TURN_MS), false);
+      book.busy = false;
+    }
+  };
+  bookEl.addEventListener("pointerup", end);
+  bookEl.addEventListener("pointercancel", end);
   bookEl.addEventListener("click", (e) => {
-    if (!swiped) return;
-    swiped = false;
+    if (!suppressClick) return;
+    suppressClick = false;
     e.preventDefault();
     e.stopPropagation();
   }, true);
+})();
+
+// Sonido de papel sintetizado (sin archivos); solo suena después de que ella toque la pantalla
+const paperSound = (() => {
+  let ctx = null;
+  addEventListener("pointerdown", () => {
+    try {
+      ctx ??= new (window.AudioContext || window.webkitAudioContext)();
+      ctx.resume?.();
+    } catch {}
+  }, { once: true, capture: true });
+  return {
+    play() {
+      if (!ctx || ctx.state !== "running") return;
+      const t = ctx.currentTime;
+      const dur = .42;
+      const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length) ** 2;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const band = ctx.createBiquadFilter();
+      band.type = "bandpass";
+      band.Q.value = .7;
+      band.frequency.setValueAtTime(900, t);
+      band.frequency.exponentialRampToValueAtTime(3800, t + dur);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(.16, t + .05);
+      gain.gain.exponentialRampToValueAtTime(.001, t + dur);
+      src.connect(band).connect(gain).connect(ctx.destination);
+      src.start(t);
+    },
+  };
+})();
+
+// El cuaderno se inclina apenas siguiendo el mouse (o el celular, donde no pide permiso)
+(() => {
+  if (reduceMotion) return;
+  const tilt = (x, y) => {
+    bookEl.style.setProperty("--ty", `${x.toFixed(2)}deg`);
+    bookEl.style.setProperty("--tx", `${y.toFixed(2)}deg`);
+  };
+  const lim = (v, m) => Math.min(m, Math.max(-m, v));
+  if (matchMedia("(hover: hover)").matches) {
+    addEventListener("pointermove", (e) => {
+      if (e.pointerType === "mouse") tilt((e.clientX / innerWidth - .5) * 6, -(e.clientY / innerHeight - .5) * 5);
+    });
+  } else if ("DeviceOrientationEvent" in window && typeof DeviceOrientationEvent.requestPermission !== "function") {
+    let base = null;
+    addEventListener("deviceorientation", (e) => {
+      if (e.gamma == null || e.beta == null) return;
+      base ??= { g: e.gamma, b: e.beta };
+      tilt(lim((e.gamma - base.g) * .25, 5), lim(-(e.beta - base.b) * .2, 4));
+    });
+  }
 })();
 
 function buildBook(gift, restoring) {
@@ -219,7 +344,11 @@ function initLock() {
   const tilesBox = $("#code-tiles");
   const submit = $("#code-submit");
   const msg = $("#code-msg");
-  const tiles = Array.from({ length: LEN }, () => el("span", { class: "tile" }));
+  const tiles = Array.from({ length: LEN }, (_, i) => {
+    const t = el("span", { class: "tile" });
+    t.style.setProperty("--i", i); // para la ola de letras al acertar
+    return t;
+  });
   tilesBox.append(...tiles);
 
   let focused = false;
@@ -303,7 +432,9 @@ function initLock() {
     store.set(state);
     loadPhotosScript().catch(() => {}); // precarga mientras gira la hoja
     const pages = buildBook(state.gift, false);
-    await sleep(350);
+    await sleep(900); // deja ver la ola de letras
+    setCurrent(0);
+    paperSound.play();
     await turnAway($("#page-lock"));
     pages[0].onEnter();
   });
@@ -468,6 +599,13 @@ function ticketPage(gift, frame) {
     });
   });
   skip.addEventListener("click", () => finish?.());
+  // ya raspada, tocarla le vuelve a pasar el brillo
+  wrap.addEventListener("click", () => {
+    if (!state.revealed) return;
+    ticket.classList.remove("is-shining");
+    void ticket.offsetWidth;
+    ticket.classList.add("is-shining");
+  });
   page.onEnter = () => {
     setTimeout(() => { if (!state.revealed) skip.hidden = false; }, 12000);
   };
@@ -592,7 +730,14 @@ function questionPage(gift) {
   const yes = el("button", { class: "btn btn--wax", type: "button", text: "¡Sí!" });
   const no = el("button", { class: "btn btn--outline btn--no", type: "button", text: "No" });
   const actions = el("div", { class: "question__actions" }, yes, no);
-  const question = el("div", { class: "question" }, el("h2", { class: "question__text", text: gift.pregunta }), actions);
+  // la pregunta aparece letra por letra cuando la hoja queda arriba
+  const letters = [...gift.pregunta].map((ch, i) => {
+    const s = el("span", { class: "q-ch", "aria-hidden": "true", text: ch === " " ? " " : ch });
+    s.style.setProperty("--i", i);
+    return s;
+  });
+  const question = el("div", { class: "question" },
+    el("h2", { class: "question__text", "aria-label": gift.pregunta }, letters), actions);
   page.body.append(question);
 
   let escapes = 0;
@@ -677,7 +822,14 @@ function countdown(iso) {
       return;
     }
     const parts = [Math.floor(d / 864e5), Math.floor(d / 36e5) % 24, Math.floor(d / 6e4) % 60, Math.floor(d / 1e3) % 60];
-    parts.forEach((v, i) => { nums[i].textContent = String(v).padStart(2, "0"); });
+    parts.forEach((v, i) => {
+      const text = String(v).padStart(2, "0");
+      if (nums[i].textContent === text) return;
+      nums[i].textContent = text;
+      nums[i].classList.remove("flip"); // cada número que cambia da un saltito
+      void nums[i].offsetWidth;
+      nums[i].classList.add("flip");
+    });
   };
   const timer = setInterval(tick, 1000);
   tick();
@@ -754,6 +906,7 @@ function photoPage(frames) {
     frame.style.setProperty("--y", `${y}%`);
     frame.style.setProperty("--w", `${w}%`);
     frame.style.setProperty("--tilt", `${tilt}deg`);
+    frame.style.setProperty("--i", i); // se pegan una por una
   });
   page.body.append(el("div", { class: "collage" }, frames));
   return page;
@@ -765,6 +918,29 @@ function finalPage(gift, frame) {
     frame ? el("div", { class: "stuck stuck--final" }, frame) : null,
     el("p", { class: "closing", text: gift.final }),
     el("p", { class: "closing__sign", text: `— ${gift.firma}` }));
+
+  // corazoncitos que suben mientras la última hoja está a la vista
+  const HEARTS = ["#c2456b", "#e07a9a", "#f4b6c8", "#d81e1e"];
+  const spawn = () => {
+    const h = el("span", { class: "heart", "aria-hidden": "true", text: "♥" });
+    h.style.left = `${8 + Math.random() * 84}%`;
+    h.style.color = HEARTS[(Math.random() * HEARTS.length) | 0];
+    h.style.setProperty("--d", `${3.2 + Math.random() * 2.6}s`);
+    h.style.setProperty("--s", (.6 + Math.random() * .9).toFixed(2));
+    h.style.setProperty("--x", `${((Math.random() - .5) * 70).toFixed(0)}px`);
+    page.el.append(h);
+    setTimeout(() => h.remove(), 6500);
+  };
+  let timer = 0;
+  page.onEnter = () => {
+    if (reduceMotion) return;
+    for (let i = 0; i < 10; i++) setTimeout(spawn, i * 140);
+    clearInterval(timer);
+    timer = setInterval(() => {
+      if (!page.el.classList.contains("is-current")) return clearInterval(timer);
+      spawn();
+    }, 800);
+  };
   return page;
 }
 
@@ -889,7 +1065,11 @@ const confetti = (() => {
   }
 
   function tick() {
-    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    // borrar el canvas entero (no solo innerWidth×innerHeight): si la ventana cambió, no quedan restos en los bordes
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
     parts = parts.filter((p) => p.y < innerHeight + 30);
     for (const p of parts) {
       p.vx *= .985;
@@ -915,7 +1095,11 @@ const confetti = (() => {
     raf = parts.length ? requestAnimationFrame(tick) : 0;
   }
 
-  const start = () => { if (!raf) raf = requestAnimationFrame(tick); };
+  const start = () => {
+    if (raf) return;
+    resize(); // por si la ventana cambió desde la última vez
+    raf = requestAnimationFrame(tick);
+  };
 
   return {
     burst(x = innerWidth / 2, y = innerHeight / 2, count = 120) {
@@ -949,6 +1133,7 @@ if (saved?.gift) {
   const at = Math.min(state.page || 0, pages.length - 1);
   pages.slice(0, at).forEach((p) => p.el.classList.add("is-turned", "is-gone"));
   book.index = at;
+  setCurrent(at);
   pages[at].onEnter?.();
 } else {
   initLock();

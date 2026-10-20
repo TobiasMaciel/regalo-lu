@@ -1,6 +1,6 @@
-/* ───────── Tokens: cuaderno sobre fondo casi blanco ───────── */
+/* ───────── Tokens: cuaderno sobre fondo blanco grisáceo ───────── */
 :root {
-  --desk: #f8f3f2;
+  --desk: #eaeae7;
   --page: #ebe5d8;
   --page-2: #e0d8c7;
   --rule: rgba(60, 70, 90, .16);
@@ -34,7 +34,7 @@ body {
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
 }
-/* fondo casi blanco, con un leve tono cálido */
+/* fondo blanco grisáceo, liso */
 body::before, body::after {
   content: "";
   position: fixed;
@@ -43,10 +43,10 @@ body::before, body::after {
   z-index: 0;
 }
 body::before {
-  background: linear-gradient(170deg, #fdfbfa, #f8f2f1 55%, #f3ebea);
+  background: linear-gradient(170deg, #f1f1ef, #eaeae7 55%, #e3e3df);
 }
 body::after {
-  background: radial-gradient(90% 60% at 50% 25%, rgba(255, 255, 255, .6), transparent 65%);
+  background: radial-gradient(90% 60% at 50% 25%, rgba(255, 255, 255, .55), transparent 65%);
 }
 
 [hidden] { display: none !important; }
@@ -108,7 +108,13 @@ body::after {
   width: min(100%, 440px);
   margin-left: 10px; /* lugar para la espiral */
   touch-action: pan-y;
+  /* se inclina apenas con el mouse o el celular (--tx/--ty desde JS) */
+  transform: perspective(1400px) rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg));
+  transition: transform .6s var(--ease-out);
+  /* entra deslizándose al abrir la página */
+  animation: book-in 1s var(--ease-out) both;
 }
+@keyframes book-in { from { opacity: 0; translate: 0 60px; rotate: -4deg; } }
 .book::after { /* espiral: es del cuaderno, no de cada hoja */
   content: "";
   position: absolute;
@@ -153,6 +159,9 @@ body::after {
   flex-direction: column;
   min-height: min(84svh, 680px);
   overflow: hidden; /* nada de una hoja asoma por debajo de la de arriba */
+  isolation: isolate; /* cada hoja es su propia capa: lo de una hoja de abajo nunca tapa a la de arriba */
+  user-select: none; /* arrastrar la hoja no selecciona texto */
+  -webkit-user-select: none;
   transform-origin: left center;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
@@ -163,16 +172,51 @@ body::after {
   box-shadow:
     3px 3px 0 -1px #d6cfbf,
     6px 6px 0 -2px #c9c1b0,
-    0 34px 50px -22px rgba(110, 50, 60, .45),
-    0 2px 6px rgba(110, 50, 60, .22);
+    0 34px 50px -22px rgba(40, 40, 40, .4),
+    0 2px 6px rgba(40, 40, 40, .2);
 }
 .page:not(.is-bottom) { box-shadow: 0 1px 2px rgba(0, 0, 0, .18); }
 .page.is-turned {
   transform: perspective(2200px) rotateY(-180deg);
   pointer-events: none;
 }
-.page.is-turning { box-shadow: 30px 0 40px -20px rgba(0, 0, 0, .35); }
+.page.is-turning, .page.is-dragging { box-shadow: 30px 0 40px -20px rgba(0, 0, 0, .35); }
 .page.is-gone { visibility: hidden; }
+
+/* sombra que recorre la hoja mientras se dobla (--shade desde JS al arrastrar) */
+.page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(to left, rgba(60, 45, 35, .4), rgba(60, 45, 35, .12) 45%, transparent 75%);
+  opacity: var(--shade, 0);
+}
+.page.is-flipping::after { animation: turn-shade var(--turn-ms, 1.15s) ease-in-out; }
+@keyframes turn-shade { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+
+/* esquina doblada: invita a pasar la hoja */
+.page__corner {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-bottom-right-radius: 20px;
+  cursor: pointer;
+  background: linear-gradient(135deg, #fbf8f1 0%, #e6dfd0 46%, rgba(0, 0, 0, .18) 49%, #cfc6b3 50%, #d9d1c0 100%);
+  filter: drop-shadow(-2px -2px 3px rgba(0, 0, 0, .12));
+  transition: width .35s var(--ease-out), height .35s var(--ease-out), opacity .3s;
+}
+.page__corner.is-off { opacity: 0; pointer-events: none; }
+.page__corner.is-new { animation: corner-peel 2.4s 1s ease-in-out infinite; }
+.page__corner:hover { width: 54px; height: 54px; }
+@keyframes corner-peel { 0%, 65%, 100% { width: 38px; height: 38px; } 78% { width: 56px; height: 56px; } }
 
 .page__body {
   flex: 1;
@@ -197,6 +241,7 @@ body::after {
   transition: opacity .3s;
 }
 .page__turn--prev { font-weight: 500; color: var(--ink-faint); }
+.page__turn--next { margin-right: 30px; } /* deja lugar a la esquina doblada */
 .page__turn.is-off { visibility: hidden; }
 .page__turn--next.is-new { color: var(--pen); animation: nudge-x 1.8s .4s ease-in-out infinite; }
 @keyframes nudge-x { 0%, 70%, 100% { transform: none; } 80% { transform: translateX(4px); } 90% { transform: translateX(0); } }
@@ -297,7 +342,11 @@ body::after {
 
 .code__tiles.is-error { animation: shake .45s; }
 .code__tiles.is-error .tile { border-bottom-color: var(--pen); }
-.code__tiles.is-ok .tile { border-bottom-color: var(--ink); }
+.code__tiles.is-ok .tile {
+  border-bottom-color: var(--ink);
+  animation: wave .6s calc(var(--i) * 80ms) var(--ease-spring) both;
+}
+@keyframes wave { 40% { transform: translateY(-14px) scale(1.12); } }
 @keyframes shake {
   20%, 60% { transform: translateX(-8px); }
   40%, 80% { transform: translateX(8px); }
@@ -386,6 +435,11 @@ body::after {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+/* la entrada se pega girando al llegar a la hoja */
+.page.is-current .glued { animation: glue-in .9s .2s var(--ease-out) both; }
+@keyframes glue-in { from { opacity: 0; transform: translateY(-26px) rotate(-8deg) scale(1.06); } }
+.page--gift .ticket-wrap { cursor: pointer; }
+
 .tape {
   position: absolute;
   z-index: 3;
@@ -565,6 +619,16 @@ body::after {
   min-height: 200px;
 }
 .question__actions .btn { min-width: 112px; }
+.q-ch { display: inline-block; }
+.page.is-current .q-ch { animation: q-in .6s calc(var(--i) * 60ms + 350ms) var(--ease-spring) both; }
+@keyframes q-in { from { opacity: 0; transform: translateY(20px) rotate(-8deg); } }
+.question .btn--wax { animation: heartbeat 1.8s 1.4s ease-in-out infinite; }
+@keyframes heartbeat {
+  0%, 45%, 100% { transform: scale(1); }
+  12% { transform: scale(1.08); }
+  24% { transform: scale(1); }
+  34% { transform: scale(1.05); }
+}
 .btn--no {
   transition: left .35s var(--ease-out), top .35s var(--ease-out), transform .2s;
 }
@@ -607,6 +671,8 @@ body::after {
   text-transform: uppercase;
   color: var(--ink-soft);
 }
+.countdown__num.flip { animation: flip .4s var(--ease-out); }
+@keyframes flip { from { opacity: 0; transform: translateY(-45%); } }
 .countdown__done { margin: 0 0 22px; font: italic 600 32px/1.2 var(--serif); color: var(--pen); }
 
 .actions {
@@ -677,6 +743,17 @@ body::after {
   -webkit-user-drag: none;
 }
 .polaroid.is-loading img { animation: pulse 1.4s ease-in-out infinite; }
+/* al quedar la hoja arriba, las polaroids caen y se pegan una por una */
+.page.is-current .polaroid { animation: stick .75s calc(var(--i, 0) * 150ms + 250ms) var(--ease-out) both; }
+@keyframes stick {
+  from {
+    opacity: 0;
+    transform: rotate(calc(var(--tilt, 0deg) * 2.5)) translateY(-18px) scale(1.14);
+    box-shadow: 0 30px 34px -12px rgba(0, 0, 0, .35);
+  }
+}
+.polaroid { transition: transform .25s var(--ease-out), box-shadow .25s; }
+.polaroid:active { transform: rotate(0deg) scale(1.05); box-shadow: 0 18px 28px -10px rgba(0, 0, 0, .4); z-index: 10; }
 @keyframes pulse { 50% { opacity: .55; } }
 .polaroid--tall img { aspect-ratio: 3 / 4; }
 .polaroid__cap {
@@ -738,6 +815,22 @@ body::after {
   margin: 0;
   font: italic 600 28px/1 var(--serif);
   color: var(--pen);
+}
+.page.is-current .closing { animation: rise-in 1s .3s var(--ease-out) both; }
+.page.is-current .closing__sign { animation: rise-in 1s .8s var(--ease-out) both; }
+.heart {
+  position: absolute;
+  bottom: 40px;
+  z-index: 4;
+  font-size: calc(22px * var(--s, 1));
+  line-height: 1;
+  pointer-events: none;
+  animation: float-up var(--d, 4s) ease-in forwards;
+}
+@keyframes float-up {
+  0% { opacity: 0; transform: translate(0, 0) scale(.6); }
+  12% { opacity: .9; }
+  100% { opacity: 0; transform: translate(var(--x, 0), -560px) rotate(18deg) scale(1); }
 }
 
 /* ───────── Visor de fotos ───────── */
