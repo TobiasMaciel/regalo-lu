@@ -137,14 +137,38 @@ function setCurrent(i) {
 
 // El cuaderno tiene tamaño fijo de diseño y se escala para entrar entero en la pantalla
 let fitScale = 1;
+const typing = () => document.activeElement?.matches?.("input") ?? false;
 function fitBook() {
+  if (typing()) return keepFieldVisible(); // el teclado no achica el cuaderno
   const W = 392;
   const H = 680;
-  const vw = window.visualViewport?.width ?? innerWidth;
-  const vh = window.visualViewport?.height ?? innerHeight;
-  fitScale = Math.min((vw - 20) / W, (vh - 28) / H, 1.25);
+  fitScale = Math.min((innerWidth - 20) / W, (innerHeight - 28) / H, 1.25);
   $("#fit").style.setProperty("--fit", fitScale.toFixed(4));
 }
+
+// Con el teclado abierto, el cuaderno sube lo justo para que las casillas queden a la vista
+let shift = 0;
+function keepFieldVisible() {
+  const field = document.activeElement?.closest?.(".code__field");
+  const vv = window.visualViewport;
+  if (!field || !vv) return;
+  const bottom = field.getBoundingClientRect().bottom - shift; // posición sin el corrimiento actual
+  const visible = vv.offsetTop + vv.height;
+  shift = Math.min(0, visible - bottom - 28);
+  $(".stage").style.transform = shift ? `translateY(${shift}px)` : "";
+}
+addEventListener("focusin", (e) => {
+  if (e.target.matches("input")) setTimeout(keepFieldVisible, 350);
+});
+addEventListener("focusout", () => {
+  setTimeout(() => {
+    if (typing()) return;
+    shift = 0;
+    $(".stage").style.transform = "";
+    window.scrollTo(0, 0); // iOS a veces corre la página al enfocar
+    fitBook();
+  }, 100);
+});
 fitBook();
 addEventListener("resize", fitBook);
 window.visualViewport?.addEventListener("resize", fitBook);
@@ -199,7 +223,7 @@ async function turnTo(target, { from } = {}) {
 
 // Arrastrar la hoja con el dedo: sigue al dedo en 3D y al soltar termina de girar o vuelve
 (() => {
-  const NO_DRAG = "button, a, input, .scratch, .glued, .question__actions, .code, .code__field, dialog";
+  const NO_DRAG = "button, a, input, .scratch, .glued, .question__actions, .code, .code__field, .detail__photo, dialog";
   const clamp = (v) => Math.min(1, Math.max(0, v));
   let d = null;
   let draggedAt = -1e9; // el "click" que el navegador dispara al soltar un arrastre no debe contar como toque
@@ -316,6 +340,7 @@ function buildBook(gift, restoring) {
   const pages = [
     letterPage(gift, photos.frames[0], restoring),
     gift.numero?.codigo ? numberPage(gift) : null,
+    gift.detalle ? detailPage(gift, photos) : null,
     ticketPage(gift, photos.frames[1]),
     questionPage(gift),
     setlistPage(gift),
@@ -933,19 +958,20 @@ function codeField(len, numeric) {
   return api;
 }
 
-// Hoja "Te falta algo": el regalo todavía no; primero hay que encontrar un número escondido
+// Hoja "Te falta algo": el regalo todavía no; primero hay que encontrar un número
 function numberPage(gift) {
   const page = makePage("page--number", "Te falta algo");
   const cfg = gift.numero;
   const code = normalizePassword(String(cfg.codigo)).replace(/[^A-Z0-9]/g, "");
-  // caja de regalo cerrada: se sacude al tocarla y se abre al acertar
-  const box = el("button", { class: "box", type: "button", "aria-label": "El regalo, cerrado" },
-    el("span", { class: "box__base" }), el("span", { class: "box__lid" }), el("span", { class: "box__bow" }));
+  // la lata en 3D: flota, la etiqueta gira; al tocarla da una vuelta rápida y salta
+  const box = el("button", { class: "can", type: "button", "aria-label": "La lata" },
+    el("span", { class: "can__glow" }), el("span", { class: "can__body" }), el("span", { class: "can__lid" }));
+  const canWrap = el("div", { class: "can-wrap" }, box, el("span", { class: "can__shadow" }));
   box.addEventListener("click", () => {
     if (box.classList.contains("is-open")) return;
-    box.classList.remove("is-wobbling");
+    box.classList.remove("is-spinning");
     void box.offsetWidth;
-    box.classList.add("is-wobbling");
+    box.classList.add("is-spinning");
     vibrate(15);
   });
   const field = codeField(code.length, /^\d+$/.test(code));
@@ -956,14 +982,14 @@ function numberPage(gift) {
   page.body.append(
     el("h2", { class: "number__title", text: cfg.titulo }),
     el("p", { class: "number__text", text: cfg.texto }),
-    box, field.el, msg, cfg.pista ? hintBtn : null, hint);
+    canWrap, field.el, msg, cfg.pista ? hintBtn : null, hint);
 
   const solved = () => {
     field.set(code);
     field.input.disabled = true;
     field.tilesBox.classList.add("is-ok");
     box.classList.add("is-open");
-    box.setAttribute("aria-label", "El regalo, abierto");
+    box.setAttribute("aria-label", "La lata, abierta");
     msg.remove();
     hintBtn.remove();
     hint.remove();
@@ -995,6 +1021,75 @@ function numberPage(gift) {
     vibrate([60, 40, 60]);
     setTimeout(() => { field.set(""); field.input.focus(); }, 650);
   };
+  return page;
+}
+
+/* ───────── Hoja: el detalle escondido en una foto ───────── */
+
+// "Todavía no.": en una de las fotos hay un corazoncito camuflado; hay que encontrarlo y tocarlo
+function detailPage(gift, photos) {
+  const page = makePage("page--detail", "Todavía no");
+  const cfg = gift.detalle;
+  const img = el("img", { class: "detail__img", alt: "", decoding: "async" });
+  const heart = el("button", { class: "detail__heart", type: "button", "aria-label": "Algo escondido" }, el("span", { text: "♥" }));
+  heart.style.left = `${cfg.x}%`;
+  heart.style.top = `${cfg.y}%`;
+  const photo = el("div", { class: "detail__photo is-loading" }, img, heart);
+  const msg = el("p", { class: "code__msg", role: "status", "aria-live": "polite" });
+  const hintBtn = el("button", { class: "hint-btn", type: "button", text: "¿Pista?" });
+  const hint = el("p", { class: "lock__hint", text: cfg.pista, hidden: true });
+  hintBtn.addEventListener("click", () => {
+    hint.hidden = !hint.hidden;
+    heart.classList.add("is-hinting");
+  });
+  page.body.append(
+    el("h2", { class: "number__title", text: cfg.titulo }),
+    el("p", { class: "number__text", text: cfg.texto }),
+    el("div", { class: "detail__frame" }, el("span", { class: "tape tape--polaroid", "aria-hidden": "true" }), photo),
+    msg, cfg.pista ? hintBtn : null, hint);
+
+  photos.whenLoaded((list) => {
+    const p = list[cfg.foto] ?? list[0];
+    if (!p) return;
+    photo.style.aspectRatio = `${p.w} / ${p.h}`;
+    img.src = p.url;
+    photo.classList.remove("is-loading");
+  });
+
+  const found = () => {
+    heart.classList.add("is-found");
+    heart.disabled = true;
+    msg.remove();
+    hintBtn.remove();
+    hint.remove();
+    page.body.append(el("p", { class: "number__ok", text: cfg.ok }));
+  };
+  if (state.detalle) {
+    found();
+    return page;
+  }
+
+  page.ready = false;
+  let misses = 0;
+  photo.addEventListener("click", (e) => {
+    if (e.target.closest(".detail__heart") || heart.disabled) return;
+    // tocó en otro lado: una marquita y vibra; a los 4 intentos el corazón late para ayudar
+    const mark = el("span", { class: "detail__miss", "aria-hidden": "true" });
+    mark.style.left = `${e.offsetX}px`;
+    mark.style.top = `${e.offsetY}px`;
+    photo.append(mark);
+    setTimeout(() => mark.remove(), 700);
+    vibrate(25);
+    if (++misses >= 4) heart.classList.add("is-hinting");
+  });
+  heart.addEventListener("click", () => {
+    save({ detalle: true });
+    found();
+    const r = heart.getBoundingClientRect();
+    confetti.burst(r.left + r.width / 2, r.top + r.height / 2, 150);
+    vibrate([30, 40, 90]);
+    setReady(page);
+  });
   return page;
 }
 
@@ -1076,6 +1171,7 @@ const TILTS = [5, -4, -6, 4, 3, -5, 4];
 function photoSlots(gift) {
   const captions = (gift.fotos || []).map((f) => f.texto || "");
   let photos = null;
+  const waiting = []; // hojas que necesitan las fotos ya descifradas (la del detalle escondido)
   const frames = captions.map((caption, i) => {
     const img = el("img", { alt: caption, decoding: "async" });
     const btn = el("button", { class: "polaroid is-loading", type: "button", "aria-label": caption || `Ver foto ${i + 1}`,
@@ -1089,6 +1185,10 @@ function photoSlots(gift) {
 
   return {
     frames,
+    whenLoaded(cb) {
+      if (photos) cb(photos);
+      else waiting.push(cb);
+    },
     async load(key) {
       if (!frames.length || !key) return;
       try { photos = await decryptPhotos(key); } catch { return; }
@@ -1100,6 +1200,7 @@ function photoSlots(gift) {
         // las verticales van en marco vertical (tipo Instax) para no cortar caras
         if (p.h > p.w) frame.classList.add("polaroid--tall");
       });
+      waiting.splice(0).forEach((cb) => cb(photos));
     },
   };
 }

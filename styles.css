@@ -62,6 +62,7 @@ body::after {
   position: relative;
   z-index: 1;
   height: 100%;
+  transition: transform .3s var(--ease-out); /* sube cuando se abre el teclado */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -761,7 +762,7 @@ body::after {
 .polaroid.is-loading img { animation: pulse 1.4s ease-in-out infinite; }
 /* la primera vez que la hoja queda arriba, las polaroids caen y se pegan una por una.
    Hasta entonces no se ven: así no "parpadean" mientras se revela la hoja de abajo. */
-.page:not(.is-current):not(.is-seen) :is(.polaroid, .glued, .q-ch, .closing, .closing__sign, .box) { opacity: 0; }
+.page:not(.is-current):not(.is-seen) :is(.polaroid, .glued, .q-ch, .closing, .closing__sign, .can-wrap, .detail__frame) { opacity: 0; }
 .page.is-current:not(.is-seen) .polaroid { animation: stick .75s calc(var(--i, 0) * 150ms + 250ms) var(--ease-out) both; }
 @keyframes stick {
   from {
@@ -947,85 +948,169 @@ body::after {
   color: var(--ink-soft);
   text-wrap: balance;
 }
-/* caja de regalo cerrada (dibujada con CSS) */
-.box {
+/* lata en 3D (dibujada con CSS): cilindro con luces y sombras, flota y la etiqueta gira */
+.can-wrap {
   position: relative;
-  width: 132px;
-  height: 128px;
-  margin: 26px auto 28px;
+  width: 110px;
+  height: 200px;
+  margin: 20px auto 30px;
+}
+.can {
+  position: absolute;
+  inset: 0;
   padding: 0;
   border: 0;
   background: none;
   cursor: pointer;
-  transform-origin: 50% 100%;
+  animation: can-float 3.4s ease-in-out infinite;
 }
-.box__base {
+@keyframes can-float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-10px) rotate(2deg); }
+}
+.can__shadow {
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 0;
-  height: 84px;
-  border-radius: 4px 4px 8px 8px;
-  background:
-    linear-gradient(90deg, transparent 43%, #f6e7c8 43% 57%, transparent 57%),
-    linear-gradient(90deg, rgba(0, 0, 0, .14), transparent 30%, rgba(255, 255, 255, .12) 50%, transparent 70%, rgba(0, 0, 0, .16)),
-    linear-gradient(180deg, #cf5679, var(--pen) 60%, var(--pen-deep));
-  box-shadow: 0 16px 22px -12px rgba(0, 0, 0, .45);
-}
-.box__lid {
-  position: absolute;
-  left: 2px;
-  right: 2px;
-  top: 22px;
-  height: 28px;
-  border-radius: 5px;
-  background:
-    linear-gradient(90deg, transparent 43%, #f8ecd2 43% 57%, transparent 57%),
-    linear-gradient(180deg, #d9668b, #b83c62);
-  box-shadow: 0 4px 6px -2px rgba(0, 0, 0, .3);
-  transition: transform .7s var(--ease-spring);
-}
-.box__bow { /* moño */
-  position: absolute;
-  left: 50%;
-  top: 4px;
-  width: 0;
-  height: 0;
-  transition: transform .7s var(--ease-spring);
-}
-.box__bow::before, .box__bow::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  width: 30px;
-  height: 22px;
-  border: 6px solid #f6e7c8;
-  border-radius: 50% 50% 40% 40%;
-}
-.box__bow::before { right: -2px; transform: rotate(-24deg); }
-.box__bow::after { left: -2px; transform: rotate(24deg); }
-.box.is-wobbling { animation: wobble .7s var(--ease-out); }
-@keyframes wobble {
-  20% { transform: rotate(-8deg) translateY(-6px); }
-  45% { transform: rotate(6deg) translateY(-10px); }
-  70% { transform: rotate(-3deg); }
-}
-/* al acertar el número, la tapa salta y queda abierta */
-.box.is-open .box__lid { transform: translate(-14px, -34px) rotate(-18deg); }
-.box.is-open .box__bow { transform: translate(-14px, -34px) rotate(-18deg); }
-.box.is-open .box__base::after { /* luz que sale de la caja */
-  content: "";
-  position: absolute;
-  left: 10%;
-  right: 10%;
-  top: -36px;
-  height: 40px;
+  left: 8px;
+  right: 8px;
+  bottom: -16px;
+  height: 18px;
   border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 100%, rgba(255, 236, 190, .9), transparent 70%);
-  animation: fade-in .8s var(--ease-out) both;
+  background: radial-gradient(ellipse, rgba(40, 20, 10, .38), transparent 70%);
+  animation: can-shadow 3.4s ease-in-out infinite;
 }
-.page.is-current:not(.is-seen) .box { animation: can-in .9s .25s var(--ease-spring) both; }
-@keyframes can-in { from { opacity: 0; transform: translateY(-40px) rotate(-12deg); } }
+@keyframes can-shadow { 50% { transform: scale(.82); opacity: .6; } }
+.can__body {
+  --face: radial-gradient(ellipse 15px 5px at 50% 55%, #3b2313 62%, transparent 68%),
+          radial-gradient(circle 27px at 50% 47%, #fdf3da 90%, #e9c993 95%, transparent 100%);
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 14px;
+  bottom: 0;
+  overflow: hidden;
+  border-radius: 0 0 50% 50% / 0 0 14px 14px;
+  /* etiqueta: la cara pasa de un lado al otro, como si la lata girara */
+  background:
+    var(--face),
+    linear-gradient(180deg, transparent 0 14%, #9d1418 14% 17%, transparent 17% 83%, #9d1418 83% 86%, transparent 86%),
+    linear-gradient(180deg, #df3030, #c41f22 60%, #a9171b);
+  background-size: 220px 100%, 220px 100%, 100% 100%;
+  background-repeat: repeat-x;
+  animation: can-turn 9s linear infinite;
+}
+.can__body::after { /* volumen del cilindro: bordes oscuros y un brillo */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(0, 0, 0, .55), rgba(0, 0, 0, .12) 16%, rgba(255, 255, 255, .42) 30%, rgba(255, 255, 255, .06) 42%, rgba(0, 0, 0, .04) 68%, rgba(0, 0, 0, .5));
+}
+@keyframes can-turn { to { background-position: 220px 0, 220px 0, 0 0; } }
+.can.is-spinning { animation: can-jump .8s var(--ease-out); }
+.can.is-spinning .can__body { animation: can-turn .8s cubic-bezier(.3, .6, .3, 1); }
+@keyframes can-jump {
+  30% { transform: translateY(-34px) rotate(-6deg) scale(1.04); }
+  60% { transform: translateY(0) rotate(3deg) scale(.98, 1.02); }
+}
+.can__lid {
+  position: absolute;
+  left: -5px;
+  right: -5px;
+  top: 0;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 35%, #ffffff, #e2e2e2 50%, #a8a8a8 82%, #8a8a8a);
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .16), 0 3px 4px rgba(0, 0, 0, .25);
+  transition: transform .9s var(--ease-spring), opacity .9s;
+}
+.can__lid::after { /* aro interior de la tapa */
+  content: "";
+  position: absolute;
+  inset: 5px 11px;
+  border-radius: 50%;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3), 0 1px 0 rgba(255, 255, 255, .7);
+}
+.can__glow {
+  position: absolute;
+  left: -30px;
+  right: -30px;
+  top: -70px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 80%, rgba(255, 230, 170, .95), rgba(255, 220, 150, .35) 40%, transparent 70%);
+  opacity: 0;
+  transition: opacity .8s .2s;
+  pointer-events: none;
+}
+/* al acertar: la tapa sale volando y sale luz de adentro */
+.can.is-open { animation: none; }
+.can.is-open .can__lid { transform: translate(34px, -78px) rotate(32deg); }
+.can.is-open .can__glow { opacity: 1; }
+.page.is-current:not(.is-seen) .can-wrap { animation: can-in 1s .25s var(--ease-spring) both; }
+@keyframes can-in { from { opacity: 0; transform: translateY(-50px) rotate(-14deg) scale(.9); } }
+
+/* ───────── Todavía no: el detalle escondido en una foto ───────── */
+.page--detail .page__body { align-items: center; justify-content: center; text-align: center; }
+.detail__frame {
+  position: relative;
+  width: 100%;
+  margin: 22px 0 6px;
+  padding: 9px 9px 30px;
+  background: #fbfaf6;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .22), 0 16px 26px -14px rgba(0, 0, 0, .55);
+  transform: rotate(-1.5deg);
+}
+.page.is-current:not(.is-seen) .detail__frame { animation: stick .8s .3s var(--ease-out) both; }
+.detail__photo {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #d9d4ca;
+  cursor: crosshair;
+}
+.detail__photo.is-loading { animation: pulse 1.4s ease-in-out infinite; }
+.detail__img { display: block; width: 100%; height: 100%; object-fit: cover; -webkit-user-drag: none; }
+/* el corazoncito camuflado entre las flores; el área para tocarlo es más grande que el dibujo */
+.detail__heart {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: crosshair;
+}
+.detail__heart span {
+  display: block;
+  font-size: 15px;
+  line-height: 34px;
+  color: #ee7fb4;
+  opacity: .85;
+  transform: rotate(-14deg);
+  text-shadow: 0 0 1px rgba(160, 40, 90, .35);
+  transition: transform .6s var(--ease-spring), opacity .4s, color .4s;
+}
+.detail__heart.is-hinting span { animation: heart-hint 1.6s ease-in-out infinite; }
+@keyframes heart-hint { 50% { transform: rotate(-14deg) scale(1.6); opacity: 1; } }
+.detail__heart.is-found span {
+  animation: none;
+  opacity: 1;
+  color: var(--pen);
+  transform: rotate(0) scale(3.2);
+  text-shadow: 0 2px 8px rgba(255, 255, 255, .9);
+}
+.detail__miss { /* marquita donde tocó y no era */
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border: 2px solid rgba(255, 255, 255, .9);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: miss .7s var(--ease-out) forwards;
+}
+@keyframes miss { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
+
 .number__field { width: min(100%, var(--w, 220px)); }
 .number__ok {
   margin: 18px 0 0;
