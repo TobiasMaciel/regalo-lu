@@ -73,7 +73,9 @@ let photosScript;
 function loadPhotosScript() {
   photosScript ??= new Promise((resolve, reject) => {
     if (window.FOTOS_ENC) return resolve();
-    document.head.append(el("script", { src: "fotos.enc.js", onload: resolve, onerror: reject }));
+    // con la versión que trae el regalo: nunca se mezcla un archivo de fotos viejo (en caché) con uno nuevo
+    const v = window.GIFT_ENC?.fotos ? `?v=${window.GIFT_ENC.fotos}` : "";
+    document.head.append(el("script", { src: `fotos.enc.js${v}`, onload: resolve, onerror: reject }));
   });
   return photosScript;
 }
@@ -81,10 +83,12 @@ function loadPhotosScript() {
 async function decryptPhotos(keyB64) {
   await loadPhotosScript();
   const key = await crypto.subtle.importKey("raw", fromB64(keyB64), "AES-GCM", false, ["decrypt"]);
-  return Promise.all((window.FOTOS_ENC || []).map(async (f) => {
+  // si una foto falla, las demás se muestran igual (esa queda en null)
+  const results = await Promise.allSettled((window.FOTOS_ENC || []).map(async (f) => {
     const buf = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(f.iv) }, key, fromB64(f.data));
     return { url: URL.createObjectURL(new Blob([buf], { type: f.type })), w: f.w, h: f.h };
   }));
+  return results.map((r) => (r.status === "fulfilled" ? r.value : null));
 }
 
 /* ───────── El cuaderno: hojas apiladas que se pasan hacia adelante y atrás ───────── */
@@ -330,22 +334,38 @@ const paperSound = (() => {
   });
 })();
 
+// Dónde va cada foto a lo largo del cuaderno (índice = orden de privado/fotos por nombre).
+// Las que no figuran acá van a los collages, de a 4 por hoja.
+const PLAN = { letter: [0, 2], number: [3, 4], ticket: [1, 8], question: [5, 15], setlist: [13], final: 25 };
+
 function buildBook(gift, restoring) {
   const photos = photoSlots(gift);
   const n = photos.frames.length;
-  // 1 foto en la carta, 1 bajo la entrada, la última en el cierre y las del medio en collages de hasta 4
-  const middle = [];
-  for (let i = 2; i < n - 1; i += 4) middle.push(photos.frames.slice(i, Math.min(i + 4, n - 1)));
+  const used = new Set(gift.detalle ? [gift.detalle.foto] : []);
+  const take = (idx) => [].concat(idx).filter((i) => i < n && !used.has(i)).map((i) => {
+    used.add(i);
+    return photos.frames[i];
+  });
+  const letterFrames = take(PLAN.letter);
+  const numberFrames = take(PLAN.number);
+  const ticketFrames = take(PLAN.ticket);
+  const questionFrames = take(PLAN.question);
+  const setlistFrames = take(PLAN.setlist);
+  let finalFrame = take(PLAN.final)[0];
+  const rest = photos.frames.filter((_, i) => !used.has(i));
+  finalFrame ??= rest.pop();
+  const collages = [];
+  for (let i = 0; i < rest.length; i += 4) collages.push(rest.slice(i, i + 4));
 
   const pages = [
-    letterPage(gift, photos.frames[0], restoring),
-    gift.numero?.codigo ? numberPage(gift) : null,
+    letterPage(gift, letterFrames, restoring),
+    gift.numero?.codigo ? numberPage(gift, numberFrames) : null,
     gift.detalle ? detailPage(gift, photos) : null,
-    ticketPage(gift, photos.frames[1]),
-    questionPage(gift),
-    setlistPage(gift),
-    ...middle.map((frames) => photoPage(frames)),
-    finalPage(gift, n > 2 ? photos.frames[n - 1] : null),
+    ticketPage(gift, ticketFrames),
+    questionPage(gift, questionFrames),
+    setlistPage(gift, setlistFrames),
+    ...collages.map((frames) => photoPage(frames)),
+    finalPage(gift, finalFrame),
   ].filter(Boolean);
 
   // cada hoja nueva va debajo de la anterior (en el DOM, antes = más abajo)
@@ -514,7 +534,35 @@ function writeLine(box, text, instant) {
 
 const tapOn = (target) => new Promise((resolve) => target.addEventListener("click", () => resolve(), { once: true }));
 
-function letterPage(gift, frame, restoring) {
+// Pega una polaroid en la hoja: clase de posición, giro y orden en que cae
+function stick(frame, cls, tilt, i = 0) {
+  if (!frame) return null;
+  frame.style.setProperty("--tilt", `${tilt}deg`);
+  frame.style.setProperty("--i", i);
+  return el("div", { class: `stuck ${cls}` }, frame);
+}
+
+// Dibujitos a mano (birome rosa) que se dibujan solos la primera vez que se llega a la hoja
+const DOODLES = {
+  heart: "M12 20.5C9 18 3.5 14 3.5 9.2 3.5 6.4 5.6 4.5 8 4.5c1.7 0 3.1 1 4 2.4.9-1.4 2.3-2.4 4-2.4 2.4 0 4.5 1.9 4.5 4.7 0 4.8-5.5 8.8-8.5 11.3z",
+  star: "M12 3.2l2.5 5.6 6 .6-4.5 4 1.3 5.9L12 16.3l-5.3 3 1.3-5.9-4.5-4 6-.6z",
+  sparkle: "M12 2.5c.6 4.6 2.9 6.9 7.5 7.5-4.6.6-6.9 2.9-7.5 7.5-.6-4.6-2.9-6.9-7.5-7.5 4.6-.6 6.9-2.9 7.5-7.5z",
+  swirl: "M3 16c3-7 9-9 12-6s-1 7-4 5 1-9 10-8",
+  arrow: "M3 6c5 1 10 5 13 12M16 18l-1-5M16 18l-5-1",
+};
+function doodle(kind, cls) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("class", `doodle ${cls}`);
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", DOODLES[kind]);
+  path.setAttribute("pathLength", "100");
+  svg.append(path);
+  return svg;
+}
+
+function letterPage(gift, frames, restoring) {
   const page = makePage("notebook--lined page--letter", "Carta");
   const lines = el("div", { class: "paper__lines", "aria-live": "polite" });
   page.body.append(
@@ -523,7 +571,10 @@ function letterPage(gift, frame, restoring) {
     el("div", { class: "paper__ruled ruled" },
       el("p", { class: "paper__greeting", text: `${gift.nombre}:` }),
       lines));
-  if (frame) page.el.append(el("div", { class: "stuck stuck--letter" }, frame));
+  page.el.append(
+    stick(frames[1], "stuck--letter-b", -7, 0),
+    stick(frames[0], "stuck--letter", 5, 1),
+    doodle("heart", "doodle--letter"));
 
   if (restoring) {
     gift.intro.forEach((t) => writeLine(lines, t, true));
@@ -594,7 +645,7 @@ function buildTicket(gift) {
       el("span", { html: barcode(s.artista + s.inicio) })));
 }
 
-function ticketPage(gift, frame) {
+function ticketPage(gift, frames) {
   const page = makePage("page--gift", "Tu regalo");
   const ticket = buildTicket(gift);
   const canvas = el("canvas", { class: "scratch", "aria-hidden": "true" });
@@ -605,7 +656,10 @@ function ticketPage(gift, frame) {
       el("span", { class: "tape tape--tl", "aria-hidden": "true" }),
       el("span", { class: "tape tape--br", "aria-hidden": "true" })),
     skip,
-    frame ? el("div", { class: "stuck stuck--gift" }, frame) : null);
+    frames.length ? el("div", { class: "stuck-row" },
+      stick(frames[0], "stuck--gift", -5, 0),
+      stick(frames[1], "stuck--gift-b", 6, 1)) : null);
+  page.el.append(doodle("star", "doodle--gift"), doodle("sparkle", "doodle--gift-b"));
 
   if (state.revealed) {
     canvas.remove();
@@ -753,8 +807,12 @@ const ICON = {
   play: '<svg viewBox="0 0 10 12" fill="currentColor" aria-hidden="true"><path d="M0 0l10 6-10 6z"/></svg>',
 };
 
-function questionPage(gift) {
+function questionPage(gift, frames = []) {
   const page = makePage("page--question", "Pregunta");
+  page.el.append(
+    stick(frames[0], "stuck--q-a", -8, 0),
+    stick(frames[1], "stuck--q-b", 7, 1),
+    doodle("heart", "doodle--question"));
   if (state.answered) {
     page.body.append(answerBlock(gift));
     return page;
@@ -959,14 +1017,19 @@ function codeField(len, numeric) {
 }
 
 // Hoja "Te falta algo": el regalo todavía no; primero hay que encontrar un número
-function numberPage(gift) {
+function numberPage(gift, frames = []) {
   const page = makePage("page--number", "Te falta algo");
   const cfg = gift.numero;
   const code = normalizePassword(String(cfg.codigo)).replace(/[^A-Z0-9]/g, "");
   // la lata en 3D: flota, la etiqueta gira; al tocarla da una vuelta rápida y salta
   const box = el("button", { class: "can", type: "button", "aria-label": "La lata" },
     el("span", { class: "can__glow" }), el("span", { class: "can__body" }), el("span", { class: "can__lid" }));
-  const canWrap = el("div", { class: "can-wrap" }, box, el("span", { class: "can__shadow" }));
+  // la lata va flanqueada por dos fotos y unas chispitas dibujadas
+  const canWrap = el("div", { class: "can-wrap" },
+    stick(frames[0], "stuck--flank-l", -9, 0),
+    stick(frames[1], "stuck--flank-r", 8, 1),
+    box, el("span", { class: "can__shadow" }),
+    doodle("sparkle", "doodle--can"), doodle("sparkle", "doodle--can-b"));
   box.addEventListener("click", () => {
     if (box.classList.contains("is-open")) return;
     box.classList.remove("is-spinning");
@@ -1095,8 +1158,9 @@ function detailPage(gift, photos) {
 
 /* ───────── Hojas: canciones, fotos y cierre ───────── */
 
-function setlistPage(gift) {
+function setlistPage(gift, frames = []) {
   const page = makePage("page--setlist", "Canciones");
+  page.el.append(stick(frames[0], "stuck--setlist", 6, 0), doodle("sparkle", "doodle--setlist"));
   const s = gift.show;
   page.body.append(
     el("h2", { class: "page__title", text: "Para ir escuchando" }),
@@ -1134,9 +1198,10 @@ function photoPage(frames) {
 function finalPage(gift, frame) {
   const page = makePage("page--final", "Final");
   page.body.append(
-    frame ? el("div", { class: "stuck stuck--final" }, frame) : null,
+    stick(frame, "stuck--final", -3, 0),
     el("p", { class: "closing", text: gift.final }),
     el("p", { class: "closing__sign", text: `— ${gift.firma}` }));
+  page.el.append(doodle("heart", "doodle--final"), doodle("sparkle", "doodle--final-b"), doodle("star", "doodle--final-c"));
 
   // corazoncitos que suben mientras la última hoja está a la vista
   const HEARTS = ["#c2456b", "#e07a9a", "#f4b6c8", "#d81e1e"];
@@ -1175,8 +1240,13 @@ function photoSlots(gift) {
   const frames = captions.map((caption, i) => {
     const img = el("img", { alt: caption, decoding: "async" });
     const btn = el("button", { class: "polaroid is-loading", type: "button", "aria-label": caption || `Ver foto ${i + 1}`,
-      onclick: () => photos && openViewer(photos, captions, i) },
-      el("span", { class: "tape tape--polaroid", "aria-hidden": "true" }),
+      onclick: () => {
+        if (!photos?.[i]) return;
+        // el visor recorre solo las fotos que se pudieron descifrar
+        const ok = photos.map((p, j) => (p ? j : -1)).filter((j) => j >= 0);
+        openViewer(ok.map((j) => photos[j]), ok.map((j) => captions[j]), ok.indexOf(i));
+      } },
+      el("span", { class: `tape tape--polaroid${i % 2 ? " tape--washi" : ""}`, "aria-hidden": "true" }),
       img,
       el("span", { class: "polaroid__cap", text: caption }));
     btn.style.setProperty("--tilt", `${TILTS[i % TILTS.length]}deg`);
@@ -1194,7 +1264,7 @@ function photoSlots(gift) {
       try { photos = await decryptPhotos(key); } catch { return; }
       photos.forEach((p, i) => {
         const frame = frames[i];
-        if (!frame) return;
+        if (!frame || !p) return;
         frame.querySelector("img").src = p.url;
         frame.classList.remove("is-loading");
         // las verticales van en marco vertical (tipo Instax) para no cortar caras
@@ -1367,6 +1437,15 @@ if (saved?.gift) {
   pages[at].onEnter?.();
 } else {
   initLock();
+  // adelanto en el candado: polaroids desenfocadas (miniaturas diminutas, sin cifrar; no se reconoce a nadie)
+  const TEASE = [[-10, 0], [3, 1], [12, 2]];
+  $("#teaser").append(...(window.ADELANTO || []).slice(0, 3).map((src, i) => {
+    const p = el("span", { class: "teaser__photo" }, el("span", { class: "teaser__img" }));
+    p.firstChild.style.backgroundImage = `url("${src}")`;
+    p.style.setProperty("--tilt", `${TEASE[i][0]}deg`);
+    p.style.setProperty("--i", TEASE[i][1]);
+    return p;
+  }));
   // al entrar se ve la carta; al segundo la hoja gira sola (o antes, si la toca)
   const intro = $("#page-intro");
   let turned = false;

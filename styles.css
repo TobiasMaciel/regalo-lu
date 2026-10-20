@@ -12,7 +12,7 @@
   --mark: #d81e1e;          /* las letras rojas de la carta en papel */
   --on-desk: #ece4d4;
 
-  --serif: "Cormorant Garamond", "Cormorant", Garamond, Georgia, "Times New Roman", serif;
+  --serif: "Fraunces", Georgia, "Times New Roman", serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .22 0 0 0 .45 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -85,7 +85,7 @@ body::after {
   border: 0;
   border-radius: 999px;
   padding: 14px 30px;
-  font: 600 19px/1 var(--serif);
+  font: 500 17px/1 var(--serif);
   letter-spacing: .02em;
   cursor: pointer;
   transition: transform .2s var(--ease-out), box-shadow .2s, background .2s, opacity .2s;
@@ -253,7 +253,7 @@ body::after {
   border: 0;
   background: none;
   padding: 10px 2px;
-  font: italic 600 20px/1 var(--serif);
+  font: italic 500 18px/1 var(--serif);
   color: var(--ink);
   cursor: pointer;
   transition: opacity .3s;
@@ -264,12 +264,12 @@ body::after {
 .page__turn--next.is-new { color: var(--pen); animation: nudge-x 1.8s .4s ease-in-out infinite; }
 @keyframes nudge-x { 0%, 70%, 100% { transform: none; } 80% { transform: translateX(4px); } 90% { transform: translateX(0); } }
 .page__num {
-  font: italic 500 16px var(--serif);
+  font: italic 400 14px var(--serif);
   color: var(--ink-faint);
 }
 .page__title {
   margin: 4px 0 16px;
-  font: italic 600 32px/1.05 var(--serif);
+  font: italic 500 28px/1.1 var(--serif);
   color: var(--ink);
 }
 
@@ -278,15 +278,15 @@ body::after {
 .intro__title {
   margin: 0;
   text-align: center;
-  font: 400 52px/1 var(--serif);
+  font: 400 44px/1 var(--serif);
   letter-spacing: .02em;
   color: var(--ink);
 }
 .intro__sub {
   margin: 4px 0 30px;
   text-align: center;
-  font: 500 17px/1 var(--serif);
-  letter-spacing: .2em;
+  font: 500 14px/1 var(--serif);
+  letter-spacing: .24em;
   text-transform: uppercase;
   color: var(--ink-soft);
 }
@@ -295,7 +295,7 @@ body::after {
   --base: 21px;
   flex: 1; /* los renglones siguen hasta el final de la hoja */
   margin: 0;
-  font: italic 400 17px/28px var(--serif);
+  font: italic 300 15.5px/28px var(--serif);
   color: var(--ink);
   text-indent: 1.4em;
 }
@@ -310,7 +310,7 @@ body::after {
 }
 .lock__title {
   margin: 0 0 34px;
-  font: italic 500 68px/1 var(--serif);
+  font: italic 400 62px/1 var(--serif);
   letter-spacing: -.01em;
   color: var(--ink);
 }
@@ -339,7 +339,7 @@ body::after {
   place-items: end center;
   padding-bottom: 2px;
   border-bottom: 1.5px solid rgba(36, 35, 34, .4);
-  font: 600 40px/1 var(--serif);
+  font: 500 36px/1 var(--serif);
   color: var(--mark); /* las letras se escriben en rojo, como en la carta */
   transition: border-color .2s;
 }
@@ -388,7 +388,7 @@ body::after {
 .code__msg {
   min-height: 1.4em;
   margin: 16px 0 0;
-  font: italic 500 20px/1.3 var(--serif);
+  font: italic 400 18px/1.3 var(--serif);
   color: var(--pen);
 }
 .hint-btn {
@@ -397,7 +397,7 @@ body::after {
   padding: 8px 12px;
   border: 0;
   background: none;
-  font: italic 500 18px var(--serif);
+  font: italic 400 16px var(--serif);
   color: var(--ink-faint);
   text-decoration: underline;
   text-decoration-style: dotted;
@@ -407,7 +407,7 @@ body::after {
 .lock__hint {
   margin: 6px auto 0;
   max-width: 26ch;
-  font: italic 400 20px/1.35 var(--serif);
+  font: italic 300 18px/1.4 var(--serif);
   color: var(--ink-soft);
   animation: fade-in .5s var(--ease-out);
 }
@@ -418,17 +418,17 @@ body::after {
 .paper__date {
   margin: 0 0 14px;
   text-align: right;
-  font: italic 400 18px/1 var(--serif);
+  font: italic 300 16px/1 var(--serif);
   color: var(--ink-faint);
 }
 .paper__ruled { flex: 1; }
 .paper__greeting {
   margin: 0;
-  font: italic 600 32px/40px var(--serif);
+  font: italic 500 30px/40px var(--serif);
 }
 .paper__lines p {
   margin: 0;
-  font: italic 400 26px/40px var(--serif);
+  font: italic 300 23px/40px var(--serif);
   color: var(--ink);
 }
 .ink__w { display: inline-block; white-space: nowrap; }
@@ -476,7 +476,7 @@ body::after {
   padding: 6px;
   border: 0;
   background: none;
-  font: italic 500 17px var(--serif);
+  font: italic 400 15px var(--serif);
   color: var(--ink-faint);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -624,7 +624,7 @@ body::after {
 
 .question__text {
   margin: 0 0 26px;
-  font: italic 500 66px/1 var(--serif);
+  font: italic 400 60px/1 var(--serif);
   color: var(--ink);
 }
 .question__actions {
@@ -653,7 +653,7 @@ body::after {
 
 .answer__yes {
   margin: 0 0 26px;
-  font: italic 500 36px/1.15 var(--serif);
+  font: italic 400 30px/1.15 var(--serif);
   text-wrap: balance;
 }
 .answer__label {
@@ -677,7 +677,7 @@ body::after {
 }
 .countdown__num {
   display: block;
-  font: 600 34px/1 var(--serif);
+  font: 500 30px/1 var(--serif);
   font-variant-numeric: lining-nums tabular-nums;
 }
 .countdown__label {
@@ -690,7 +690,7 @@ body::after {
 }
 .countdown__num.flip { animation: flip .4s var(--ease-out); }
 @keyframes flip { from { opacity: 0; transform: translateY(-45%); } }
-.countdown__done { margin: 0 0 22px; font: italic 600 32px/1.2 var(--serif); color: var(--pen); }
+.countdown__done { margin: 0 0 22px; font: italic 500 28px/1.2 var(--serif); color: var(--pen); }
 
 .actions {
   display: grid;
@@ -715,7 +715,7 @@ body::after {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 9px 2px;
+  padding: 6px 2px;
   color: var(--ink);
   text-decoration: none;
 }
@@ -724,7 +724,7 @@ body::after {
   font: 500 11px var(--mono);
   color: var(--ink-faint);
 }
-.setlist__t { flex: 1; font: 500 21px/1.2 var(--serif); }
+.setlist__t { flex: 1; font: 400 18px/1.25 var(--serif); }
 .setlist__play {
   width: 30px;
   height: 30px;
@@ -779,7 +779,7 @@ body::after {
   display: block;
   min-height: 34px;
   padding: 8px 4px 10px;
-  font: italic 500 17px/1.15 var(--serif);
+  font: italic 400 15px/1.2 var(--serif);
   color: var(--ink);
   text-align: center;
 }
@@ -792,19 +792,6 @@ body::after {
   transform: rotate(-5deg);
 }
 
-.stuck--letter {
-  position: absolute;
-  right: 20px;
-  bottom: 84px;
-  width: 44%;
-  max-width: 190px;
-}
-.stuck--gift {
-  align-self: flex-start;
-  width: 46%;
-  max-width: 200px;
-  margin: 34px 0 0 10%;
-}
 /* collage: varias polaroids agrupadas y superpuestas en una misma hoja */
 .page--photos { padding-left: 40px; padding-right: 14px; }
 .collage {
@@ -827,12 +814,12 @@ body::after {
 .stuck--final { width: min(60%, 240px); margin-bottom: 30px; }
 .closing {
   margin: 0 0 6px;
-  font: italic 500 48px/1.1 var(--serif);
+  font: italic 400 44px/1.1 var(--serif);
   color: var(--ink);
 }
 .closing__sign {
   margin: 0;
-  font: italic 600 28px/1 var(--serif);
+  font: italic 500 26px/1 var(--serif);
   color: var(--pen);
 }
 .page.is-current:not(.is-seen) .closing { animation: rise-in 1s .3s var(--ease-out) both; }
@@ -939,12 +926,12 @@ body::after {
 .page--number .page__body { align-items: center; justify-content: center; text-align: center; }
 .number__title {
   margin: 0 0 6px;
-  font: italic 600 40px/1.05 var(--serif);
+  font: italic 500 36px/1.05 var(--serif);
 }
 .number__text {
   margin: 0;
   max-width: 24ch;
-  font: italic 400 22px/1.3 var(--serif);
+  font: italic 300 19px/1.35 var(--serif);
   color: var(--ink-soft);
   text-wrap: balance;
 }
@@ -1082,7 +1069,7 @@ body::after {
 }
 .detail__heart span {
   display: block;
-  font-size: 15px;
+  font-size: 17px;
   line-height: 34px;
   color: #ee7fb4;
   opacity: .85;
@@ -1114,10 +1101,145 @@ body::after {
 .number__field { width: min(100%, var(--w, 220px)); }
 .number__ok {
   margin: 18px 0 0;
-  font: italic 600 28px/1.25 var(--serif);
+  font: italic 500 26px/1.25 var(--serif);
   color: var(--pen);
   animation: rise-in .8s var(--ease-out) both;
 }
+
+/* ───────── Más vida: tapa, canto de hojas, luz, fotos repartidas y dibujitos ───────── */
+
+/* tapa de tela rosa que asoma detrás de las hojas */
+.book::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -9px -13px -13px -5px;
+  border-radius: 9px 24px 24px 9px;
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, .06) 0 1.5px, transparent 1.5px 4px),
+    repeating-linear-gradient(-45deg, rgba(80, 20, 40, .07) 0 1.5px, transparent 1.5px 4px),
+    radial-gradient(120% 80% at 80% 0%, rgba(255, 255, 255, .22), transparent 60%),
+    linear-gradient(160deg, #dc8faa, #c4698a 55%, #a9506f);
+  box-shadow:
+    0 42px 60px -28px rgba(70, 25, 40, .55),
+    0 12px 22px -10px rgba(70, 25, 40, .35),
+    inset 0 0 0 1px rgba(255, 255, 255, .14),
+    inset 0 -3px 6px rgba(60, 10, 30, .25);
+}
+
+/* papel con luz: sombra cerca de la espiral y un brillo arriba a la derecha */
+.notebook {
+  background:
+    linear-gradient(90deg, rgba(70, 50, 30, .14), rgba(70, 50, 30, 0) 14%),
+    radial-gradient(130% 90% at 90% 0%, rgba(255, 255, 255, .32), transparent 58%),
+    radial-gradient(120% 80% at 30% 110%, rgba(120, 90, 60, .08), transparent 60%),
+    var(--grain), var(--page);
+}
+/* canto de las hojas de abajo: varias hojas apiladas */
+.page.is-bottom {
+  box-shadow:
+    1px 2px 0 0 #f2ede2,
+    2px 3px 0 0 #d8d0bf,
+    3px 5px 0 0 #efe9dc,
+    4px 6px 0 0 #d2c9b6,
+    5px 8px 0 0 #ebe4d5,
+    6px 9px 0 0 #cbc1ad,
+    0 2px 6px rgba(40, 30, 20, .18);
+}
+
+/* fondo con vida: luces suaves rosas y doradas que se mueven despacio */
+body::after {
+  inset: -15%;
+  background:
+    radial-gradient(38vmax 38vmax at 18% 22%, rgba(236, 170, 196, .38), transparent 62%),
+    radial-gradient(34vmax 34vmax at 84% 78%, rgba(240, 208, 150, .32), transparent 62%),
+    radial-gradient(28vmax 28vmax at 82% 14%, rgba(255, 255, 255, .7), transparent 60%),
+    radial-gradient(26vmax 26vmax at 12% 86%, rgba(214, 160, 200, .25), transparent 62%);
+  animation: drift 26s ease-in-out infinite alternate;
+}
+@keyframes drift {
+  50% { transform: translate3d(3%, -2%, 0) scale(1.05); }
+  100% { transform: translate3d(-3%, 3%, 0) scale(1.08) rotate(2deg); }
+}
+
+/* cinta washi rosa con lunares */
+.tape--washi {
+  background:
+    radial-gradient(circle at 4px 4px, rgba(255, 255, 255, .75) 1.4px, transparent 1.8px) 0 0 / 8px 8px,
+    linear-gradient(180deg, rgba(232, 140, 175, .82), rgba(214, 120, 158, .8));
+}
+
+/* fotos repartidas por las hojas */
+.stuck { position: absolute; z-index: 2; }
+.stuck .polaroid { width: 100%; }
+.stuck--letter { right: 20px; bottom: 82px; width: 44%; max-width: 172px; }
+.stuck--letter-b { left: 56px; bottom: 150px; width: 34%; max-width: 132px; }
+.stuck-row { position: relative; width: 100%; height: 230px; margin-top: 30px; }
+.stuck--gift { left: 4%; top: 0; width: 48%; }
+.stuck--gift-b { right: 2%; top: 30px; width: 42%; }
+.stuck--q-a { left: 52px; bottom: 74px; width: 112px; }
+.stuck--q-b { right: 22px; bottom: 84px; width: 104px; }
+.stuck--setlist { right: 26px; bottom: 58px; width: 98px; }
+.stuck--flank-l { left: -112px; top: 34px; width: 92px; z-index: 0; }
+.stuck--flank-r { right: -112px; top: 50px; width: 88px; z-index: 0; }
+.stuck--final { position: relative; }
+.stuck .polaroid__cap { min-height: 22px; padding: 4px; }
+
+/* dibujitos en birome rosa: se dibujan solos la primera vez que se llega a la hoja */
+.doodle {
+  position: absolute;
+  z-index: 3;
+  width: 34px;
+  height: 34px;
+  pointer-events: none;
+  fill: none;
+  stroke: var(--pen);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: .85;
+}
+.doodle path { stroke-dasharray: 100; stroke-dashoffset: 0; }
+.page:not(.is-current):not(.is-seen) .doodle path { stroke-dashoffset: 100; }
+.page.is-current:not(.is-seen) .doodle path { animation: draw 1.4s 1s ease-in-out both; }
+@keyframes draw { from { stroke-dashoffset: 100; } }
+.doodle--letter { right: 34px; top: 78px; transform: rotate(10deg); }
+.doodle--gift { right: 14px; top: 8px; width: 28px; height: 28px; transform: rotate(14deg); }
+.doodle--gift-b { left: 46px; bottom: 96px; width: 26px; height: 26px; }
+.doodle--question { right: 52px; top: 120px; width: 40px; height: 40px; transform: rotate(12deg); }
+.doodle--setlist { right: 132px; bottom: 120px; width: 24px; height: 24px; }
+.doodle--can { right: -14px; top: -22px; width: 26px; height: 26px; }
+.doodle--can-b { left: -18px; bottom: 46px; width: 20px; height: 20px; }
+.doodle--final { left: 62px; top: 44px; width: 40px; height: 40px; transform: rotate(-12deg); }
+.doodle--final-b { right: 40px; top: 70px; width: 28px; height: 28px; }
+.doodle--final-c { right: 64px; bottom: 120px; width: 26px; height: 26px; transform: rotate(18deg); }
+
+/* candado: adelanto de fotos desenfocadas */
+.teaser {
+  position: relative;
+  width: 210px;
+  height: 120px;
+  margin: -10px auto 18px;
+}
+.teaser__photo {
+  position: absolute;
+  top: 6px;
+  left: calc(50% - 46px + var(--i) * 40px - 40px);
+  width: 92px;
+  padding: 6px 6px 20px;
+  background: #fbfaf6;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .2), 0 10px 16px -10px rgba(0, 0, 0, .5);
+  transform: rotate(var(--tilt));
+  animation: tease-in .9s calc(var(--i) * 150ms + 300ms) var(--ease-spring) both;
+}
+.teaser__img {
+  display: block;
+  aspect-ratio: 1;
+  background: #d9d4ca center / cover;
+  filter: blur(4px) saturate(1.2);
+  clip-path: inset(0); /* que el desenfoque no se salga del marco */
+}
+@keyframes tease-in { from { opacity: 0; transform: translateY(-20px) rotate(calc(var(--tilt) * 3)); } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

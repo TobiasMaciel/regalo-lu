@@ -13,11 +13,12 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="styles.css?v=3eccaa6048">
   <!-- scripts clásicos (no módulos) para que también funcione abriendo el archivo con doble clic -->
-  <script defer src="gift.enc.js"></script>
-  <script defer src="app.js"></script>
+  <script defer src="adelanto.js?v=34a2b02ff7"></script>
+  <script defer src="gift.enc.js?v=a3f221ad79"></script>
+  <script defer src="app.js?v=f5cb3a05ee"></script>
 </head>
 <body>
   <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
@@ -28,6 +29,7 @@
     <div class="fit" id="fit">
     <div class="book" id="book">
       <section class="notebook page page--lock is-bottom" id="page-lock" aria-labelledby="lock-title">
+        <div class="teaser" id="teaser" aria-hidden="true"></div>
         <h1 class="lock__title" id="lock-title">Para Lu</h1>
 
         <form class="code" id="code-form" novalidate onsubmit="event.preventDefault()">
