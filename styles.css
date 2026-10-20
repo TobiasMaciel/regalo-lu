@@ -174,7 +174,7 @@ body::after {
   -webkit-backface-visibility: hidden;
   transition: transform 1.15s cubic-bezier(.45, 0, .25, 1), box-shadow 1.15s;
 }
-.page--gift {
+.page.is-bottom {
   /* las hojas de abajo asoman un poco: se nota que es un cuaderno */
   box-shadow:
     3px 3px 0 -1px #d6cfbf,
@@ -182,7 +182,8 @@ body::after {
     0 36px 60px -24px rgba(0, 0, 0, .85),
     0 2px 6px rgba(0, 0, 0, .35);
 }
-.page--letter, .page--lock { box-shadow: 0 1px 2px rgba(0, 0, 0, .18); }
+.page:not(.is-bottom) { box-shadow: 0 1px 2px rgba(0, 0, 0, .18); }
+.book { touch-action: pan-y; }
 .page.is-turned {
   transform: perspective(2200px) rotateY(-180deg);
   pointer-events: none;
@@ -618,39 +619,96 @@ body::after {
 .setlist__play svg { width: 11px; height: 11px; margin-left: 2px; }
 .setlist a:hover .setlist__play, .setlist a:focus-visible .setlist__play { transform: scale(1.12); background: var(--pen); }
 
-/* ───────── Fotos ───────── */
-.card--photos { padding: 20px 12px 12px; }
-.card--photos .card__title { padding-left: 8px; }
-.photos {
-  columns: 2;
-  column-gap: 8px;
-}
-.photo {
+/* ───────── Fotos: polaroids pegadas en las hojas ───────── */
+.polaroid {
+  position: relative;
   display: block;
   width: 100%;
-  margin: 0 0 8px;
-  padding: 0;
+  padding: 8px 8px 0;
   border: 0;
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--page-2);
-  break-inside: avoid;
+  background: #fbfaf6;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .22), 0 12px 20px -12px rgba(0, 0, 0, .5);
+  transform: rotate(var(--tilt, 0deg));
   cursor: zoom-in;
-  animation: photo-in .6s var(--ease-out) both;
+  animation: stick .7s var(--ease-out) both;
 }
-.photo img {
+@keyframes stick { from { opacity: 0; transform: rotate(var(--tilt, 0deg)) translateY(10px) scale(.96); } }
+.polaroid img {
   display: block;
   width: 100%;
-  height: auto;
-  transition: transform .5s var(--ease-out);
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: #d9d4ca;
+  -webkit-user-drag: none;
 }
-.photo:hover img { transform: scale(1.03); }
-.photo.is-loading {
-  cursor: default;
-  animation: pulse 1.4s ease-in-out infinite;
+.polaroid__cap {
+  display: block;
+  min-height: 36px;
+  padding: 8px 4px 10px;
+  font: italic 500 17px/1.15 var(--serif);
+  color: var(--ink);
+  text-align: center;
 }
-@keyframes photo-in { from { opacity: 0; transform: translateY(8px); } }
-@keyframes pulse { 50% { opacity: .55; } }
+.tape--polaroid {
+  top: -12px;
+  left: 50%;
+  width: 66px;
+  height: 22px;
+  margin-left: -33px;
+  transform: rotate(-5deg);
+}
+
+.stuck--letter {
+  position: absolute;
+  right: 18px;
+  bottom: 30px;
+  width: 44%;
+  max-width: 190px;
+}
+.stuck--gift {
+  align-self: flex-start;
+  width: 48%;
+  max-width: 200px;
+  margin: 30px 0 0 8%;
+}
+.page--photos {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  padding-left: 44px;
+  padding-right: 18px;
+}
+.page--photos .polaroid { width: min(64%, 250px); }
+.page--photos .polaroid:nth-child(odd) { align-self: flex-start; margin-left: 4%; }
+.page--photos .polaroid:nth-child(even) { align-self: flex-end; margin-right: 2%; }
+
+.book-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 22px;
+}
+.book-nav__btn {
+  appearance: none;
+  min-width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--on-desk);
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px rgba(236, 228, 212, .4);
+  font: 600 20px/1 var(--serif);
+  cursor: pointer;
+  transition: opacity .2s;
+}
+.book-nav__btn--next { padding: 0 20px; font-size: 18px; }
+.book-nav__btn:disabled { opacity: .3; cursor: default; }
+.book-nav__count {
+  font: 500 12px var(--mono);
+  letter-spacing: .14em;
+  color: var(--on-desk-soft);
+}
 
 .no-scroll, .no-scroll body { overflow: hidden; }
 

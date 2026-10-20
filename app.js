@@ -95,6 +95,7 @@ async function turnPage(page) {
 async function openBook(gift, key) {
   const state = { key, revealed: false, answered: false };
   const giftPage = prepareGift(gift, state); // la entrada ya queda pegada y tapada en la hoja 3
+  pastePhotos(gift, key);
   $("#paper-date").textContent = new Intl.DateTimeFormat("es-AR", { timeZone: TZ, day: "numeric", month: "long", year: "numeric" }).format(new Date());
   $("#paper-greeting").textContent = `${gift.nombre}:`;
   await sleep(350);
@@ -525,6 +526,7 @@ function prepareGift(gift, state) {
   const onRevealed = (instant) => {
     skip.hidden = true;
     note.hidden = true;
+    bookNav.enable();
     if (!instant) {
       ticket.classList.add("is-shining");
       const r = wrap.getBoundingClientRect();
@@ -560,7 +562,7 @@ function prepareGift(gift, state) {
 function showQuestion(gift, state, save, instant) {
   const rest = $("#gift-rest");
   if (state.answered) {
-    rest.replaceChildren(buildAfter(gift, state.key));
+    rest.replaceChildren(buildAfter(gift));
     return;
   }
 
@@ -622,7 +624,7 @@ function showQuestion(gift, state, save, instant) {
     confetti.burst(r.left + r.width / 2, r.top, 160);
     setTimeout(() => confetti.rain(160), 250);
     vibrate([30, 40, 30, 40, 120]);
-    const after = buildAfter(gift, state.key);
+    const after = buildAfter(gift);
     after.classList.add("reveal-in");
     rest.replaceChildren(after);
     after.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -637,7 +639,7 @@ const ICON = {
   play: '<svg viewBox="0 0 10 12" fill="currentColor" aria-hidden="true"><path d="M0 0l10 6-10 6z"/></svg>',
 };
 
-function buildAfter(gift, key) {
+function buildAfter(gift) {
   const s = gift.show;
   return el("div", { class: "after" },
     el("p", { class: "after__yes", text: gift.respuestaSi }),
@@ -655,35 +657,116 @@ function buildAfter(gift, key) {
             el("span", { class: "setlist__n", text: String(i + 1).padStart(2, "0") }),
             el("span", { class: "setlist__t", text: song }),
             el("span", { class: "setlist__play", html: ICON.play })))))),
-    gift.fotos?.length && key ? photoGrid(gift, key) : null,
     el("p", { class: "closing", text: gift.final }),
     el("p", { class: "closing__sign", text: `— ${gift.firma}` }));
 }
 
-/* ───────── Fotos ───────── */
+/* ───────── Fotos: polaroids pegadas en las hojas ───────── */
 
-function photoGrid(gift, key) {
+const TILTS = [5, -4, -6, 4, 3, -5];
+
+// Una en la hoja de la carta, otra debajo de la entrada y el resto de a dos en hojas nuevas
+async function pastePhotos(gift, key) {
+  if (!gift.fotos?.length || !key) return;
+  let photos;
+  try { photos = await decryptPhotos(key); } catch { return; }
+  if (!photos.length) return;
+
   const captions = gift.fotos.map((f) => f.texto || "");
-  // casilleros con la proporción ya reservada, se llenan al descifrar
-  const slots = (window.FOTOS_ENC || captions).map((f) => {
-    const slot = el("div", { class: "photo is-loading" });
-    slot.style.aspectRatio = f.w ? `${f.w} / ${f.h}` : "4 / 5";
-    return slot;
-  });
-  const grid = el("div", { class: "photos" }, slots);
-  const section = el("section", { class: "card card--photos" }, el("h3", { class: "card__title", text: "Fotos" }), grid);
+  const polaroid = (i) => {
+    const btn = el("button", { class: "polaroid", type: "button", "aria-label": captions[i] || `Ver foto ${i + 1}`, onclick: () => openViewer(photos, captions, i) },
+      el("span", { class: "tape tape--polaroid", "aria-hidden": "true" }),
+      el("img", { src: photos[i].url, alt: captions[i], decoding: "async" }),
+      el("span", { class: "polaroid__cap", text: captions[i] }));
+    btn.style.setProperty("--tilt", `${TILTS[i % TILTS.length]}deg`);
+    return btn;
+  };
 
-  decryptPhotos(key).then((photos) => {
-    grid.replaceChildren(...photos.map((p, i) => {
-      const btn = el("button", { class: "photo", type: "button", "aria-label": captions[i] || `Ver foto ${i + 1}`, onclick: () => openViewer(photos, captions, i) },
-        el("img", { src: p.url, width: p.w, height: p.h, alt: captions[i], loading: "lazy", decoding: "async" }));
-      btn.style.animationDelay = `${Math.min(i, 12) * 60}ms`;
-      return btn;
-    }));
-  }).catch(() => section.remove());
+  $("#page-letter").append(el("div", { class: "stuck stuck--letter" }, polaroid(0)));
+  if (photos.length > 1) $("#page-gift").append(el("div", { class: "stuck stuck--gift" }, polaroid(1)));
 
-  return section;
+  // las hojas nuevas van debajo de la de la entrada (en el DOM, antes = más abajo)
+  const book = $("#book");
+  let lowest = $("#page-gift");
+  for (let i = 2; i < photos.length; i += 2) {
+    const page = el("section", { class: "notebook page page--photos", "aria-label": "Fotos" },
+      polaroid(i), i + 1 < photos.length ? polaroid(i + 1) : null);
+    book.insertBefore(page, lowest);
+    lowest = page;
+  }
+  book.querySelectorAll(".page").forEach((p) => p.classList.toggle("is-bottom", p === lowest));
+  bookNav.refresh();
 }
+
+// Pasar hojas (y volver) una vez descubierta la entrada
+const bookNav = (() => {
+  const book = $("#book");
+  const nav = $("#book-nav");
+  const prev = $("#nav-prev");
+  const next = $("#nav-next");
+  const count = $("#nav-count");
+  let enabled = false;
+  let busy = false;
+
+  // de arriba hacia abajo: entrada, fotos…
+  const pages = () => [...book.querySelectorAll(".page:not(.page--lock):not(.page--letter)")].reverse();
+  const current = () => Math.max(0, pages().findIndex((p) => !p.classList.contains("is-turned")));
+
+  function refresh() {
+    const list = pages();
+    const i = current();
+    nav.hidden = !enabled || list.length < 2;
+    prev.disabled = i <= 0;
+    next.disabled = i >= list.length - 1;
+    count.textContent = `${i + 1} / ${list.length}`;
+  }
+
+  async function go(dir) {
+    const list = pages();
+    const i = current();
+    const target = i + dir;
+    if (busy || !enabled || target < 0 || target >= list.length) return;
+    busy = true;
+    if (dir > 0) {
+      await turnPage(list[i]);
+    } else {
+      const page = list[target];
+      page.hidden = false;
+      void page.offsetWidth; // que arranque girada para animar la vuelta
+      page.classList.add("is-turning");
+      page.classList.remove("is-turned");
+      await sleep(1150);
+      page.classList.remove("is-turning");
+    }
+    busy = false;
+    refresh();
+  }
+
+  prev.addEventListener("click", () => go(-1));
+  next.addEventListener("click", () => go(1));
+
+  // deslizar sobre el cuaderno; si fue un deslizamiento, no abre la foto
+  let x0 = null;
+  let swiped = false;
+  book.addEventListener("pointerdown", (e) => { x0 = enabled ? e.clientX : null; });
+  book.addEventListener("pointerup", (e) => {
+    if (x0 == null) return;
+    const dx = e.clientX - x0;
+    x0 = null;
+    if (Math.abs(dx) > 60) {
+      swiped = true;
+      go(dx < 0 ? 1 : -1);
+    }
+  });
+  book.addEventListener("click", (e) => {
+    if (!swiped) return;
+    swiped = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+
+  return { enable() { enabled = true; refresh(); }, refresh };
+})();
 
 function openViewer(photos, captions, start) {
   let i = start;
@@ -806,6 +889,7 @@ if (saved?.gift) {
   $("#page-lock").hidden = true;
   $("#page-letter").hidden = true;
   prepareGift(saved.gift, { key: saved.key, revealed: Boolean(saved.revealed), answered: Boolean(saved.answered) }).start();
+  pastePhotos(saved.gift, saved.key);
 } else {
   initLock();
 }

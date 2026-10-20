@@ -26,7 +26,7 @@
     <!-- Un solo cuaderno: las hojas están apiladas y al girar una aparece la de abajo -->
     <div class="book" id="book">
       <!-- Hoja 3: la entrada pegada -->
-      <section class="notebook page page--gift" id="page-gift" aria-label="Tu regalo">
+      <section class="notebook page page--gift is-bottom" id="page-gift" aria-label="Tu regalo">
         <div class="glued" id="glued" hidden>
           <div class="ticket-wrap is-covered" id="ticket-wrap">
             <div class="ticket" id="ticket"></div>
@@ -65,6 +65,12 @@
         <p class="lock__hint" id="lock-hint" hidden>Hay una palabra escondida en la carta.<br>Buscá las letras resaltadas.</p>
       </section>
     </div>
+
+    <nav class="book-nav" id="book-nav" aria-label="Hojas del cuaderno" hidden>
+      <button class="book-nav__btn" id="nav-prev" type="button" aria-label="Hoja anterior">‹</button>
+      <span class="book-nav__count" id="nav-count"></span>
+      <button class="book-nav__btn book-nav__btn--next" id="nav-next" type="button">Pasar la hoja ›</button>
+    </nav>
 
     <button class="btn btn--ghost book__next" id="intro-next" type="button" hidden>Seguir</button>
     <button class="link-btn" id="scratch-skip" type="button" hidden>¿No te deja rascar? Tocá acá</button>
