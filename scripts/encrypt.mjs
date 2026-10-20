@@ -67,8 +67,8 @@ let total = 0;
 for (const f of fotos) {
   const { data, info } = await sharp(new URL(f.archivo, FOTOS_DIR).pathname.replace(/^\/([A-Za-z]:)/, "$1"))
     .rotate() // respeta la orientación EXIF del celular
-    .resize({ width: 1400, height: 1400, fit: "inside", withoutEnlargement: true })
-    .webp({ quality: 78 })
+    .resize({ width: 1200, height: 1200, fit: "inside", withoutEnlargement: true })
+    .webp({ quality: 76 })
     .toBuffer({ resolveWithObject: true });
   total += data.length;
   sealedPhotos.push({ w: info.width, h: info.height, type: "image/webp", ...(await seal(data)) });
