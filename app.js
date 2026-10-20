@@ -1,11 +1,12 @@
-// Regalo para Lu — todo el contenido del regalo llega cifrado en gift.enc.js
-// y solo se puede leer con la palabra escondida en la carta.
+// Regalo para Lu — todo el contenido del regalo llega cifrado en gift.enc.js (y las fotos en
+// fotos.enc.js) y solo se puede leer con la palabra escondida en la carta.
 (() => {
 "use strict";
 
 const LEN = 6;
-const STORE_KEY = "regalo-lu:v1";
+const STORE_KEY = "regalo-lu:v2";
 const TZ = "America/Argentina/Buenos_Aires";
+const TURN_MS = 1150;
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -30,6 +31,10 @@ const store = {
   get() { try { return JSON.parse(sessionStorage.getItem(STORE_KEY)); } catch { return null; } },
   set(value) { try { sessionStorage.setItem(STORE_KEY, JSON.stringify(value)); } catch {} },
 };
+
+// { gift, key, revealed, answered, page } — se guarda en la sesión para sobrevivir a una recarga
+let state = null;
+const save = (patch) => { Object.assign(state, patch); store.set(state); };
 
 /* ───────── Cifrado (espejo de scripts/encrypt.mjs) ───────── */
 
@@ -82,30 +87,123 @@ async function decryptPhotos(keyB64) {
   }));
 }
 
-/* ───────── Hojas del cuaderno ───────── */
+/* ───────── El cuaderno: hojas apiladas que se pasan hacia adelante y atrás ───────── */
+
+const bookEl = $("#book");
+const book = { pages: [], index: 0, busy: false };
+
+function makePage(cls, label) {
+  const body = el("div", { class: "page__body" });
+  const prev = el("button", { class: "page__turn page__turn--prev", type: "button", text: "‹ Volver" });
+  const next = el("button", { class: "page__turn page__turn--next", type: "button", text: "Seguir ›" });
+  const num = el("span", { class: "page__num" });
+  const section = el("section", { class: `notebook page ${cls}`, "aria-label": label },
+    body, el("footer", { class: "page__foot" }, prev, num, next));
+  prev.addEventListener("click", () => turnTo(book.index - 1));
+  next.addEventListener("click", () => turnTo(book.index + 1));
+  return { el: section, body, prev, next, num, ready: true, onEnter: null };
+}
+
+function refreshNav() {
+  const last = book.pages.length - 1;
+  book.pages.forEach((p, i) => {
+    p.num.textContent = String(i + 1);
+    p.prev.classList.toggle("is-off", i === 0);
+    p.next.classList.toggle("is-off", i === last || !p.ready);
+  });
+}
+
+// "Seguir" aparece recién cuando la hoja se terminó (carta escrita, entrada raspada, "sí" dicho)
+function setReady(page) {
+  page.ready = true;
+  refreshNav();
+  page.next.classList.add("is-new");
+}
+
+async function turnTo(target) {
+  const { pages } = book;
+  if (book.busy || target < 0 || target >= pages.length || target === book.index) return;
+  if (target > book.index && !pages[book.index].ready) return;
+  book.busy = true;
+  if (target > book.index) {
+    await turnAway(pages[book.index].el);
+  } else {
+    const page = pages[target].el;
+    page.hidden = false;
+    void page.offsetWidth; // que arranque girada para animar la vuelta
+    page.classList.add("is-turning");
+    page.classList.remove("is-turned");
+    await sleep(TURN_MS);
+    page.classList.remove("is-turning");
+  }
+  book.index = target;
+  book.busy = false;
+  save({ page: target });
+  pages[target].onEnter?.();
+}
 
 // La hoja gira sobre la espiral y deja ver la que ya estaba abajo
-async function turnPage(page) {
+async function turnAway(page) {
   page.classList.add("is-turning", "is-turned");
-  await sleep(1150);
+  await sleep(TURN_MS);
   page.classList.remove("is-turning");
   page.hidden = true;
 }
 
-async function openBook(gift, key) {
-  const state = { key, revealed: false, answered: false };
-  const giftPage = prepareGift(gift, state); // la entrada ya queda pegada y tapada en la hoja 3
-  pastePhotos(gift, key);
-  $("#paper-date").textContent = new Intl.DateTimeFormat("es-AR", { timeZone: TZ, day: "numeric", month: "long", year: "numeric" }).format(new Date());
-  $("#paper-greeting").textContent = `${gift.nombre}:`;
-  await sleep(350);
-  await turnPage($("#page-lock"));
-  await playLetter(gift);
-  await turnPage($("#page-letter"));
-  giftPage.start();
+// deslizar para pasar de hoja; si fue un deslizamiento, no cuenta como toque
+(() => {
+  let x0 = null;
+  let swiped = false;
+  bookEl.addEventListener("pointerdown", (e) => {
+    x0 = book.pages.length && !e.target.closest(".scratch, .question__actions, .code") ? e.clientX : null;
+  });
+  bookEl.addEventListener("pointerup", (e) => {
+    if (x0 == null) return;
+    const dx = e.clientX - x0;
+    x0 = null;
+    if (Math.abs(dx) > 60) {
+      swiped = true;
+      turnTo(book.index + (dx < 0 ? 1 : -1));
+    }
+  });
+  bookEl.addEventListener("click", (e) => {
+    if (!swiped) return;
+    swiped = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+})();
+
+function buildBook(gift, restoring) {
+  const photos = photoSlots(gift);
+  const n = photos.frames.length;
+  // 1 foto en la carta, 1 bajo la entrada, la última en el cierre y las del medio de a dos
+  const middle = [];
+  for (let i = 2; i < n - 1; i += 2) middle.push(photos.frames.slice(i, Math.min(i + 2, n - 1)));
+
+  const pages = [
+    letterPage(gift, photos.frames[0], restoring),
+    ticketPage(gift, photos.frames[1]),
+    questionPage(gift),
+    setlistPage(gift),
+    ...middle.map((frames) => photoPage(frames)),
+    finalPage(gift, n > 2 ? photos.frames[n - 1] : null),
+  ];
+
+  // cada hoja nueva va debajo de la anterior (en el DOM, antes = más abajo)
+  let above = $("#page-lock");
+  for (const p of pages) {
+    bookEl.insertBefore(p.el, above);
+    above = p.el;
+  }
+  bookEl.querySelectorAll(".page").forEach((p) => p.classList.toggle("is-bottom", p === above));
+  book.pages = pages;
+  refreshNav();
+  photos.load(state.key);
+  return pages;
 }
 
-/* ───────── 1. Candado ───────── */
+/* ───────── Candado ───────── */
 
 const NOPE = [
   "No es esa. Mirá la carta de nuevo.",
@@ -196,14 +294,17 @@ function initLock() {
       return;
     }
 
-    const { gift, key } = unlocked;
     tilesBox.classList.add("is-ok");
     msg.textContent = "";
     input.blur();
     vibrate(30);
-    store.set({ gift, key, revealed: false, answered: false });
-    loadPhotosScript().catch(() => {}); // precarga mientras lee la carta
-    await openBook(gift, key);
+    state = { gift: unlocked.gift, key: unlocked.key, revealed: false, answered: false, page: 0 };
+    store.set(state);
+    loadPhotosScript().catch(() => {}); // precarga mientras gira la hoja
+    const pages = buildBook(state.gift, false);
+    await sleep(350);
+    await turnAway($("#page-lock"));
+    pages[0].onEnter();
   });
 
   function fail(text, clear) {
@@ -225,11 +326,11 @@ function initLock() {
   render();
 }
 
-/* ───────── 2. La carta ───────── */
+/* ───────── Hoja: la carta ───────── */
 
-function writeLine(box, text) {
+function writeLine(box, text, instant) {
   const STEP = 32;
-  const p = el("p");
+  const p = el("p", { class: instant ? "is-instant" : null });
   const visual = el("span", { "aria-hidden": "true" });
   let i = 0;
   for (const word of text.split(" ")) {
@@ -244,42 +345,42 @@ function writeLine(box, text) {
   }
   p.append(el("span", { class: "sr-only", text }), visual);
   box.append(p);
-  return { p, duration: reduceMotion ? 0 : i * STEP + 450 };
+  return { p, duration: reduceMotion || instant ? 0 : i * STEP + 450 };
 }
 
-const tapOn = (...targets) => new Promise((resolve) => {
-  const done = () => {
-    targets.forEach((t) => t.removeEventListener("click", done));
-    resolve();
-  };
-  targets.forEach((t) => t.addEventListener("click", done));
-});
+const tapOn = (target) => new Promise((resolve) => target.addEventListener("click", () => resolve(), { once: true }));
 
-async function playLetter(gift) {
-  const paper = $("#page-letter");
-  const lines = $("#intro-lines");
-  const next = $("#intro-next");
-  lines.textContent = "";
-  next.hidden = false;
+function letterPage(gift, frame, restoring) {
+  const page = makePage("notebook--lined page--letter", "Carta");
+  const lines = el("div", { class: "paper__lines", "aria-live": "polite" });
+  page.body.append(
+    el("p", { class: "paper__date", text: new Intl.DateTimeFormat("es-AR", { timeZone: TZ, day: "numeric", month: "long", year: "numeric" }).format(new Date()) }),
+    el("p", { class: "paper__greeting", text: `${gift.nombre}:` }),
+    lines);
+  if (frame) page.el.append(el("div", { class: "stuck stuck--letter" }, frame));
 
-  for (let i = 0; i < gift.intro.length; i++) {
-    const last = i === gift.intro.length - 1;
-    next.disabled = true;
-    next.classList.remove("is-ready");
-    const { p, duration } = writeLine(lines, gift.intro[i]);
-    // tocar la carta mientras escribe completa la línea al instante
-    await Promise.race([sleep(duration), tapOn(paper)]);
-    p.classList.add("is-instant");
-    next.textContent = last ? "Dar vuelta la hoja" : "Seguir";
-    next.disabled = false;
-    next.classList.add("is-ready");
-    await tapOn(paper, next);
+  if (restoring) {
+    gift.intro.forEach((t) => writeLine(lines, t, true));
+    return page;
   }
 
-  next.hidden = true;
+  page.ready = false;
+  let played = false;
+  page.onEnter = async () => {
+    if (played) return;
+    played = true;
+    // las líneas se escriben solas; tocar la hoja completa la que se está escribiendo
+    for (const text of gift.intro) {
+      const { p, duration } = writeLine(lines, text, false);
+      await Promise.race([sleep(duration + 500), tapOn(page.el)]);
+      p.classList.add("is-instant");
+    }
+    setReady(page);
+  };
+  return page;
 }
 
-/* ───────── 3. Ticket ───────── */
+/* ───────── Hoja: la entrada pegada ───────── */
 
 const fmt = (iso, opts) => new Intl.DateTimeFormat("es-AR", { timeZone: TZ, hour12: false, ...opts }).format(new Date(iso));
 const hour = (iso) => fmt(iso, { hour: "2-digit", minute: "2-digit" });
@@ -305,7 +406,7 @@ function buildTicket(gift) {
   const number = `Nº ${fmt(s.inicio, { day: "2-digit", month: "2-digit" }).replace("/", "")}${String(s.cantidad).padStart(2, "0")}`;
   const row = (label, ...value) => [el("dt", { text: label }), el("dd", {}, ...value)];
 
-  return [
+  return el("div", { class: "ticket" },
     el("div", { class: "ticket__main" },
       el("div", { class: "ticket__top" },
         el("span", { text: "Entrada" }),
@@ -324,11 +425,53 @@ function buildTicket(gift) {
       el("span", { class: "ticket__admit", text: "Admite" }),
       el("span", { class: "ticket__qty", text: String(s.cantidad) }),
       el("span", { class: "ticket__code", text: number }),
-      el("span", { html: barcode(s.artista + s.inicio) })),
-  ];
+      el("span", { html: barcode(s.artista + s.inicio) })));
 }
 
-/* ───────── Raspadita ───────── */
+function ticketPage(gift, frame) {
+  const page = makePage("page--gift", "Tu regalo");
+  const ticket = buildTicket(gift);
+  const canvas = el("canvas", { class: "scratch", "aria-hidden": "true" });
+  const wrap = el("div", { class: "ticket-wrap is-covered" }, ticket, canvas);
+  const skip = el("button", { class: "skip-btn", type: "button", text: "¿No te deja rascar? Tocá acá", hidden: true });
+  page.body.append(
+    el("div", { class: "glued" }, wrap,
+      el("span", { class: "tape tape--tl", "aria-hidden": "true" }),
+      el("span", { class: "tape tape--br", "aria-hidden": "true" })),
+    skip,
+    frame ? el("div", { class: "stuck stuck--gift" }, frame) : null);
+
+  if (state.revealed) {
+    canvas.remove();
+    wrap.classList.remove("is-covered");
+    return page;
+  }
+
+  page.ready = false;
+  let finish = null;
+  const onRevealed = () => {
+    skip.hidden = true;
+    ticket.classList.add("is-shining");
+    const r = wrap.getBoundingClientRect();
+    confetti.burst(r.left + r.width / 2, r.top + r.height / 2, 150);
+    setTimeout(() => confetti.rain(90), 350);
+    vibrate([40, 30, 90]);
+    save({ revealed: true });
+    setTimeout(() => setReady(page), 900);
+  };
+  // la lámina se pinta ya, con la hoja todavía tapada: nunca se ve la entrada antes de tiempo
+  requestAnimationFrame(() => {
+    setupScratch(canvas, onRevealed).then((f) => {
+      finish = f;
+      wrap.classList.remove("is-covered");
+    });
+  });
+  skip.addEventListener("click", () => finish?.());
+  page.onEnter = () => {
+    setTimeout(() => { if (!state.revealed) skip.hidden = false; }, 12000);
+  };
+  return page;
+}
 
 async function setupScratch(canvas, onDone) {
   try { await Promise.race([document.fonts.ready, sleep(1200)]); } catch {}
@@ -429,6 +572,275 @@ async function setupScratch(canvas, onDone) {
   return finish;
 }
 
+/* ───────── Hoja: ¿Vamos? ───────── */
+
+const ICON = {
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
+  cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  play: '<svg viewBox="0 0 10 12" fill="currentColor" aria-hidden="true"><path d="M0 0l10 6-10 6z"/></svg>',
+};
+
+function questionPage(gift) {
+  const page = makePage("page--question", "Pregunta");
+  if (state.answered) {
+    page.body.append(answerBlock(gift));
+    return page;
+  }
+
+  page.ready = false;
+  const yes = el("button", { class: "btn btn--wax", type: "button", text: "¡Sí!" });
+  const no = el("button", { class: "btn btn--outline btn--no", type: "button", text: "No" });
+  const actions = el("div", { class: "question__actions" }, yes, no);
+  const question = el("div", { class: "question" }, el("h2", { class: "question__text", text: gift.pregunta }), actions);
+  page.body.append(question);
+
+  let escapes = 0;
+  let lastRun = -1e9;
+  const sameGesture = () => performance.now() - lastRun < 400;
+  const run = (e) => {
+    if (no.dataset.surrender) return;
+    e?.preventDefault();
+    if (sameGesture()) return; // pointerenter/pointerdown/click de un mismo toque cuentan una vez
+    lastRun = performance.now();
+    escapes++;
+    if (escapes >= 5) {
+      no.dataset.surrender = "1";
+      no.textContent = "Bueno, dale";
+      no.classList.replace("btn--outline", "btn--wax");
+      return;
+    }
+    const box = actions.getBoundingClientRect();
+    const b = no.getBoundingClientRect();
+    const s = yes.getBoundingClientRect();
+    const maxX = box.width - b.width;
+    const maxY = box.height - b.height;
+    // nunca encima del "Sí" y siempre lejos de donde estaba
+    const overYes = (x, y) => x < s.right - box.left + 8 && x + b.width > s.left - box.left - 8 &&
+                              y < s.bottom - box.top + 8 && y + b.height > s.top - box.top - 8;
+    let x;
+    let y;
+    let tries = 0;
+    do {
+      x = Math.random() * maxX;
+      y = Math.random() * maxY;
+    } while (++tries < 200 && (overYes(x, y) || Math.hypot(x - (b.left - box.left), y - (b.top - box.top)) < 70));
+    no.classList.add("is-running");
+    no.style.left = `${x}px`;
+    no.style.top = `${y}px`;
+    vibrate(12);
+  };
+  no.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") run(e); });
+  no.addEventListener("pointerdown", run);
+  no.addEventListener("click", (e) => {
+    if (!no.dataset.surrender) run(e);
+    else if (!sameGesture()) accept();
+  });
+  yes.addEventListener("click", accept);
+
+  function accept() {
+    save({ answered: true });
+    const r = yes.getBoundingClientRect();
+    confetti.burst(r.left + r.width / 2, r.top, 160);
+    setTimeout(() => confetti.rain(160), 250);
+    vibrate([30, 40, 30, 40, 120]);
+    question.replaceWith(answerBlock(gift, true));
+    setReady(page);
+  }
+  return page;
+}
+
+function answerBlock(gift, animate) {
+  const s = gift.show;
+  return el("div", { class: `answer${animate ? " reveal-in" : ""}` },
+    el("p", { class: "answer__yes", text: gift.respuestaSi }),
+    el("p", { class: "answer__label", text: "Faltan" }),
+    countdown(s.inicio),
+    el("div", { class: "actions" },
+      el("a", { class: "btn btn--ink", href: s.mapsUrl, target: "_blank", rel: "noopener", html: `${ICON.pin}<span>Cómo llegar</span>` }),
+      el("button", { class: "btn btn--outline", type: "button", html: `${ICON.cal}<span>Agendar</span>`, onclick: () => addToCalendar(gift) })));
+}
+
+function countdown(iso) {
+  const target = new Date(iso).getTime();
+  const labels = ["días", "horas", "min", "seg"];
+  const nums = labels.map(() => el("span", { class: "countdown__num" }));
+  const box = el("div", { class: "countdown", role: "timer" },
+    labels.map((l, i) => el("div", { class: "countdown__cell" }, nums[i], el("span", { class: "countdown__label", text: l }))));
+
+  const tick = () => {
+    const d = target - Date.now();
+    if (d <= 0) {
+      clearInterval(timer);
+      const text = d > -6 * 3600e3 ? "Es hoy." : "Ya fue.";
+      box.replaceWith(el("p", { class: "countdown__done", text }));
+      return;
+    }
+    const parts = [Math.floor(d / 864e5), Math.floor(d / 36e5) % 24, Math.floor(d / 6e4) % 60, Math.floor(d / 1e3) % 60];
+    parts.forEach((v, i) => { nums[i].textContent = String(v).padStart(2, "0"); });
+  };
+  const timer = setInterval(tick, 1000);
+  tick();
+  return box;
+}
+
+function addToCalendar(gift) {
+  const s = gift.show;
+  const start = new Date(s.puertas);
+  const end = new Date(new Date(s.inicio).getTime() + 150 * 60e3);
+  const stamp = (d) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const title = `${s.artista} · ${s.gira}`;
+  const where = `${s.lugar}, ${s.direccion}`;
+  const details = `Puertas ${hour(s.puertas)} · Show ${hour(s.inicio)} · ${s.sector}`;
+
+  const ua = navigator.userAgent;
+  const apple = /iPad|iPhone|iPod|Macintosh/.test(ua) && !/Android/.test(ua);
+  if (!apple) {
+    const url = new URL("https://calendar.google.com/calendar/render");
+    url.search = new URLSearchParams({ action: "TEMPLATE", text: title, dates: `${stamp(start)}/${stamp(end)}`, location: where, details });
+    window.open(url, "_blank", "noopener");
+    return;
+  }
+
+  const esc = (t) => t.replace(/[\\,;]/g, (m) => `\\${m}`);
+  const ics = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Regalo Lu//ES", "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT",
+    `UID:${stamp(start)}-regalo-lu`,
+    `DTSTAMP:${stamp(new Date())}`,
+    `DTSTART:${stamp(start)}`,
+    `DTEND:${stamp(end)}`,
+    `SUMMARY:${esc(title)}`,
+    `LOCATION:${esc(where)}`,
+    `DESCRIPTION:${esc(details)}`,
+    "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Mañana es el show", "TRIGGER:-P1D", "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR",
+  ].join("\r\n");
+  const link = el("a", { href: URL.createObjectURL(new Blob([ics], { type: "text/calendar" })), download: "show.ics" });
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
+/* ───────── Hojas: canciones, fotos y cierre ───────── */
+
+function setlistPage(gift) {
+  const page = makePage("page--setlist", "Canciones");
+  const s = gift.show;
+  page.body.append(
+    el("h2", { class: "page__title", text: "Para ir escuchando" }),
+    el("ol", { class: "setlist" },
+      gift.canciones.map((song, i) => el("li", {},
+        el("a", { href: `https://open.spotify.com/search/${encodeURIComponent(`${s.artista} ${song}`)}`, target: "_blank", rel: "noopener" },
+          el("span", { class: "setlist__n", text: String(i + 1).padStart(2, "0") }),
+          el("span", { class: "setlist__t", text: song }),
+          el("span", { class: "setlist__play", html: ICON.play }))))));
+  return page;
+}
+
+function photoPage(frames) {
+  const page = makePage("page--photos", "Fotos");
+  page.body.append(...frames);
+  return page;
+}
+
+function finalPage(gift, frame) {
+  const page = makePage("page--final", "Final");
+  page.body.append(
+    frame ? el("div", { class: "stuck stuck--final" }, frame) : null,
+    el("p", { class: "closing", text: gift.final }),
+    el("p", { class: "closing__sign", text: `— ${gift.firma}` }));
+  return page;
+}
+
+/* ───────── Fotos: polaroids pegadas en las hojas ───────── */
+
+const TILTS = [5, -4, -6, 4, 3, -5, 4];
+
+// Arma los marcos ya (la cantidad viene en el regalo) y los llena cuando se descifran las fotos
+function photoSlots(gift) {
+  const captions = (gift.fotos || []).map((f) => f.texto || "");
+  let photos = null;
+  const frames = captions.map((caption, i) => {
+    const img = el("img", { alt: caption, decoding: "async" });
+    const btn = el("button", { class: "polaroid is-loading", type: "button", "aria-label": caption || `Ver foto ${i + 1}`,
+      onclick: () => photos && openViewer(photos, captions, i) },
+      el("span", { class: "tape tape--polaroid", "aria-hidden": "true" }),
+      img,
+      el("span", { class: "polaroid__cap", text: caption }));
+    btn.style.setProperty("--tilt", `${TILTS[i % TILTS.length]}deg`);
+    return btn;
+  });
+
+  return {
+    frames,
+    async load(key) {
+      if (!frames.length || !key) return;
+      try { photos = await decryptPhotos(key); } catch { return; }
+      photos.forEach((p, i) => {
+        const frame = frames[i];
+        if (!frame) return;
+        frame.querySelector("img").src = p.url;
+        frame.classList.remove("is-loading");
+        // las verticales van en marco vertical (tipo Instax) para no cortar caras
+        if (p.h > p.w) frame.classList.add("polaroid--tall");
+      });
+    },
+  };
+}
+
+function openViewer(photos, captions, start) {
+  let i = start;
+  const img = el("img", { class: "viewer__img", alt: "" });
+  const caption = el("p", { class: "viewer__caption" });
+  const count = el("span", { class: "viewer__count" });
+  const prev = el("button", { class: "viewer__nav viewer__nav--prev", type: "button", "aria-label": "Anterior", text: "‹" });
+  const next = el("button", { class: "viewer__nav viewer__nav--next", type: "button", "aria-label": "Siguiente", text: "›" });
+  const close = el("button", { class: "viewer__close", type: "button", "aria-label": "Cerrar", text: "×" });
+  const stage = el("div", { class: "viewer__stage" }, img);
+  const dialog = el("dialog", { class: "viewer", "aria-label": "Fotos" },
+    el("div", { class: "viewer__bar" }, count, close), stage, prev, next, caption);
+
+  const show = (n, dir = 0) => {
+    i = (n + photos.length) % photos.length;
+    img.src = photos[i].url;
+    img.alt = captions[i];
+    caption.textContent = captions[i];
+    caption.hidden = !captions[i];
+    count.textContent = `${i + 1} / ${photos.length}`;
+    img.classList.remove("from-left", "from-right");
+    if (dir) {
+      void img.offsetWidth;
+      img.classList.add(dir > 0 ? "from-right" : "from-left");
+    }
+  };
+  const single = photos.length < 2;
+  prev.hidden = next.hidden = single;
+  prev.addEventListener("click", () => show(i - 1, -1));
+  next.addEventListener("click", () => show(i + 1, 1));
+  close.addEventListener("click", () => dialog.close());
+  dialog.addEventListener("click", (e) => { if (e.target === dialog || e.target === stage) dialog.close(); });
+  dialog.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft" && !single) show(i - 1, -1);
+    if (e.key === "ArrowRight" && !single) show(i + 1, 1);
+  });
+  dialog.addEventListener("close", () => { dialog.remove(); document.documentElement.classList.remove("no-scroll"); });
+
+  // deslizar para pasar de foto
+  let x0 = null;
+  stage.addEventListener("pointerdown", (e) => { x0 = e.clientX; });
+  stage.addEventListener("pointerup", (e) => {
+    if (x0 == null || single) return;
+    const dx = e.clientX - x0;
+    x0 = null;
+    if (Math.abs(dx) > 45) show(i + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1);
+  });
+
+  document.body.append(dialog);
+  document.documentElement.classList.add("no-scroll");
+  show(start);
+  dialog.showModal();
+}
+
 /* ───────── Confetti ───────── */
 
 const confetti = (() => {
@@ -509,387 +921,21 @@ const confetti = (() => {
   };
 })();
 
-/* ───────── Regalo: ticket → pregunta → después del sí ───────── */
-
-// Pega la entrada en la hoja 3 y la tapa con la lámina; start() se llama cuando la hoja queda a la vista
-function prepareGift(gift, state) {
-  const ticket = $("#ticket");
-  const wrap = $("#ticket-wrap");
-  const canvas = $("#scratch");
-  const skip = $("#scratch-skip");
-  const note = $("#gift-note");
-  ticket.replaceChildren(...buildTicket(gift));
-  $("#glued").hidden = false;
-
-  const save = (patch) => { Object.assign(state, patch); store.set({ gift, ...state }); };
-
-  const onRevealed = (instant) => {
-    skip.hidden = true;
-    note.hidden = true;
-    bookNav.enable();
-    if (!instant) {
-      ticket.classList.add("is-shining");
-      const r = wrap.getBoundingClientRect();
-      confetti.burst(r.left + r.width / 2, r.top + r.height / 2, 150);
-      setTimeout(() => confetti.rain(90), 350);
-      vibrate([40, 30, 90]);
-    }
-    save({ revealed: true });
-    setTimeout(() => showQuestion(gift, state, save, instant), instant ? 0 : 1300);
-  };
-
-  if (state.revealed) {
-    canvas.remove();
-    wrap.classList.remove("is-covered");
-    onRevealed(true);
-    return { start() {} };
-  }
-
-  let finish = null;
-  setupScratch(canvas, () => onRevealed(false)).then((f) => {
-    finish = f;
-    wrap.classList.remove("is-covered");
-  });
-  return {
-    start() {
-      note.hidden = false;
-      setTimeout(() => { if (!state.revealed) skip.hidden = false; }, 9000);
-      skip.addEventListener("click", () => finish?.(), { once: true });
-    },
-  };
-}
-
-function showQuestion(gift, state, save, instant) {
-  const rest = $("#gift-rest");
-  if (state.answered) {
-    rest.replaceChildren(buildAfter(gift));
-    return;
-  }
-
-  const yes = el("button", { class: "btn btn--wax", type: "button", text: "¡Sí!" });
-  const no = el("button", { class: "btn btn--ghost btn--no", type: "button", text: "No" });
-  const actions = el("div", { class: "question__actions" }, yes, no);
-  const question = el("div", { class: `question${instant ? "" : " reveal-in"}` },
-    el("h2", { class: "question__text", text: gift.pregunta }),
-    actions);
-  rest.replaceChildren(question);
-  if (!instant) question.scrollIntoView({ behavior: "smooth", block: "center" });
-
-  let escapes = 0;
-  let lastRun = -1e9;
-  const sameGesture = () => performance.now() - lastRun < 400;
-  const run = (e) => {
-    if (no.dataset.surrender) return;
-    e?.preventDefault();
-    if (sameGesture()) return; // pointerenter/pointerdown/click de un mismo toque cuentan una vez
-    lastRun = performance.now();
-    escapes++;
-    if (escapes >= 5) {
-      no.dataset.surrender = "1";
-      no.textContent = "Bueno, dale";
-      no.classList.replace("btn--ghost", "btn--wax");
-      return;
-    }
-    const box = actions.getBoundingClientRect();
-    const b = no.getBoundingClientRect();
-    const s = yes.getBoundingClientRect();
-    const maxX = box.width - b.width;
-    const maxY = box.height - b.height;
-    // nunca encima del "Sí" y siempre lejos de donde estaba
-    const overYes = (x, y) => x < s.right - box.left + 8 && x + b.width > s.left - box.left - 8 &&
-                              y < s.bottom - box.top + 8 && y + b.height > s.top - box.top - 8;
-    let x;
-    let y;
-    let tries = 0;
-    do {
-      x = Math.random() * maxX;
-      y = Math.random() * maxY;
-    } while (++tries < 200 && (overYes(x, y) || Math.hypot(x - (b.left - box.left), y - (b.top - box.top)) < 70));
-    no.classList.add("is-running");
-    no.style.left = `${x}px`;
-    no.style.top = `${y}px`;
-    vibrate(12);
-  };
-  no.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") run(e); });
-  no.addEventListener("pointerdown", run);
-  no.addEventListener("click", (e) => {
-    if (!no.dataset.surrender) run(e);
-    else if (!sameGesture()) accept();
-  });
-  yes.addEventListener("click", accept);
-
-  function accept() {
-    save({ answered: true });
-    const r = yes.getBoundingClientRect();
-    confetti.burst(r.left + r.width / 2, r.top, 160);
-    setTimeout(() => confetti.rain(160), 250);
-    vibrate([30, 40, 30, 40, 120]);
-    const after = buildAfter(gift);
-    after.classList.add("reveal-in");
-    rest.replaceChildren(after);
-    after.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-}
-
-/* ───────── Después del sí ───────── */
-
-const ICON = {
-  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
-  cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
-  play: '<svg viewBox="0 0 10 12" fill="currentColor" aria-hidden="true"><path d="M0 0l10 6-10 6z"/></svg>',
-};
-
-function buildAfter(gift) {
-  const s = gift.show;
-  return el("div", { class: "after" },
-    el("p", { class: "after__yes", text: gift.respuestaSi }),
-    el("section", { class: "card", "aria-label": "Cuenta regresiva" },
-      el("h3", { class: "card__title", text: "Faltan" }),
-      countdown(s.inicio)),
-    el("div", { class: "actions" },
-      el("a", { class: "btn btn--light", href: s.mapsUrl, target: "_blank", rel: "noopener", html: `${ICON.pin}<span>Cómo llegar</span>` }),
-      el("button", { class: "btn btn--ghost", type: "button", html: `${ICON.cal}<span>Agendar</span>`, onclick: () => addToCalendar(gift) })),
-    el("section", { class: "card" },
-      el("h3", { class: "card__title", text: "Para ir escuchando" }),
-      el("ol", { class: "setlist" },
-        gift.canciones.map((song, i) => el("li", {},
-          el("a", { href: `https://open.spotify.com/search/${encodeURIComponent(`${s.artista} ${song}`)}`, target: "_blank", rel: "noopener" },
-            el("span", { class: "setlist__n", text: String(i + 1).padStart(2, "0") }),
-            el("span", { class: "setlist__t", text: song }),
-            el("span", { class: "setlist__play", html: ICON.play })))))),
-    el("p", { class: "closing", text: gift.final }),
-    el("p", { class: "closing__sign", text: `— ${gift.firma}` }));
-}
-
-/* ───────── Fotos: polaroids pegadas en las hojas ───────── */
-
-const TILTS = [5, -4, -6, 4, 3, -5];
-
-// Una en la hoja de la carta, otra debajo de la entrada y el resto de a dos en hojas nuevas
-async function pastePhotos(gift, key) {
-  if (!gift.fotos?.length || !key) return;
-  let photos;
-  try { photos = await decryptPhotos(key); } catch { return; }
-  if (!photos.length) return;
-
-  const captions = gift.fotos.map((f) => f.texto || "");
-  const polaroid = (i) => {
-    const btn = el("button", { class: "polaroid", type: "button", "aria-label": captions[i] || `Ver foto ${i + 1}`, onclick: () => openViewer(photos, captions, i) },
-      el("span", { class: "tape tape--polaroid", "aria-hidden": "true" }),
-      el("img", { src: photos[i].url, alt: captions[i], decoding: "async" }),
-      el("span", { class: "polaroid__cap", text: captions[i] }));
-    btn.style.setProperty("--tilt", `${TILTS[i % TILTS.length]}deg`);
-    return btn;
-  };
-
-  $("#page-letter").append(el("div", { class: "stuck stuck--letter" }, polaroid(0)));
-  if (photos.length > 1) $("#page-gift").append(el("div", { class: "stuck stuck--gift" }, polaroid(1)));
-
-  // las hojas nuevas van debajo de la de la entrada (en el DOM, antes = más abajo)
-  const book = $("#book");
-  let lowest = $("#page-gift");
-  for (let i = 2; i < photos.length; i += 2) {
-    const page = el("section", { class: "notebook page page--photos", "aria-label": "Fotos" },
-      polaroid(i), i + 1 < photos.length ? polaroid(i + 1) : null);
-    book.insertBefore(page, lowest);
-    lowest = page;
-  }
-  book.querySelectorAll(".page").forEach((p) => p.classList.toggle("is-bottom", p === lowest));
-  bookNav.refresh();
-}
-
-// Pasar hojas (y volver) una vez descubierta la entrada
-const bookNav = (() => {
-  const book = $("#book");
-  const nav = $("#book-nav");
-  const prev = $("#nav-prev");
-  const next = $("#nav-next");
-  const count = $("#nav-count");
-  let enabled = false;
-  let busy = false;
-
-  // de arriba hacia abajo: entrada, fotos…
-  const pages = () => [...book.querySelectorAll(".page:not(.page--lock):not(.page--letter)")].reverse();
-  const current = () => Math.max(0, pages().findIndex((p) => !p.classList.contains("is-turned")));
-
-  function refresh() {
-    const list = pages();
-    const i = current();
-    nav.hidden = !enabled || list.length < 2;
-    prev.disabled = i <= 0;
-    next.disabled = i >= list.length - 1;
-    count.textContent = `${i + 1} / ${list.length}`;
-  }
-
-  async function go(dir) {
-    const list = pages();
-    const i = current();
-    const target = i + dir;
-    if (busy || !enabled || target < 0 || target >= list.length) return;
-    busy = true;
-    if (dir > 0) {
-      await turnPage(list[i]);
-    } else {
-      const page = list[target];
-      page.hidden = false;
-      void page.offsetWidth; // que arranque girada para animar la vuelta
-      page.classList.add("is-turning");
-      page.classList.remove("is-turned");
-      await sleep(1150);
-      page.classList.remove("is-turning");
-    }
-    busy = false;
-    refresh();
-  }
-
-  prev.addEventListener("click", () => go(-1));
-  next.addEventListener("click", () => go(1));
-
-  // deslizar sobre el cuaderno; si fue un deslizamiento, no abre la foto
-  let x0 = null;
-  let swiped = false;
-  book.addEventListener("pointerdown", (e) => { x0 = enabled ? e.clientX : null; });
-  book.addEventListener("pointerup", (e) => {
-    if (x0 == null) return;
-    const dx = e.clientX - x0;
-    x0 = null;
-    if (Math.abs(dx) > 60) {
-      swiped = true;
-      go(dx < 0 ? 1 : -1);
-    }
-  });
-  book.addEventListener("click", (e) => {
-    if (!swiped) return;
-    swiped = false;
-    e.preventDefault();
-    e.stopPropagation();
-  }, true);
-
-  return { enable() { enabled = true; refresh(); }, refresh };
-})();
-
-function openViewer(photos, captions, start) {
-  let i = start;
-  const img = el("img", { class: "viewer__img", alt: "" });
-  const caption = el("p", { class: "viewer__caption" });
-  const count = el("span", { class: "viewer__count" });
-  const prev = el("button", { class: "viewer__nav viewer__nav--prev", type: "button", "aria-label": "Anterior", text: "‹" });
-  const next = el("button", { class: "viewer__nav viewer__nav--next", type: "button", "aria-label": "Siguiente", text: "›" });
-  const close = el("button", { class: "viewer__close", type: "button", "aria-label": "Cerrar", text: "×" });
-  const stage = el("div", { class: "viewer__stage" }, img);
-  const dialog = el("dialog", { class: "viewer", "aria-label": "Fotos" },
-    el("div", { class: "viewer__bar" }, count, close), stage, prev, next, caption);
-
-  const show = (n, dir = 0) => {
-    i = (n + photos.length) % photos.length;
-    img.src = photos[i].url;
-    img.alt = captions[i];
-    caption.textContent = captions[i];
-    caption.hidden = !captions[i];
-    count.textContent = `${i + 1} / ${photos.length}`;
-    img.classList.remove("from-left", "from-right");
-    if (dir) {
-      void img.offsetWidth;
-      img.classList.add(dir > 0 ? "from-right" : "from-left");
-    }
-  };
-  const single = photos.length < 2;
-  prev.hidden = next.hidden = single;
-  prev.addEventListener("click", () => show(i - 1, -1));
-  next.addEventListener("click", () => show(i + 1, 1));
-  close.addEventListener("click", () => dialog.close());
-  dialog.addEventListener("click", (e) => { if (e.target === dialog || e.target === stage) dialog.close(); });
-  dialog.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowLeft" && !single) show(i - 1, -1);
-    if (e.key === "ArrowRight" && !single) show(i + 1, 1);
-  });
-  dialog.addEventListener("close", () => { dialog.remove(); document.documentElement.classList.remove("no-scroll"); });
-
-  // deslizar para pasar de foto
-  let x0 = null;
-  stage.addEventListener("pointerdown", (e) => { x0 = e.clientX; });
-  stage.addEventListener("pointerup", (e) => {
-    if (x0 == null || single) return;
-    const dx = e.clientX - x0;
-    x0 = null;
-    if (Math.abs(dx) > 45) show(i + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1);
-  });
-
-  document.body.append(dialog);
-  document.documentElement.classList.add("no-scroll");
-  show(start);
-  dialog.showModal();
-}
-
-function countdown(iso) {
-  const target = new Date(iso).getTime();
-  const labels = ["días", "horas", "min", "seg"];
-  const nums = labels.map(() => el("span", { class: "countdown__num" }));
-  const box = el("div", { class: "countdown", role: "timer" },
-    labels.map((l, i) => el("div", { class: "countdown__cell" }, nums[i], el("span", { class: "countdown__label", text: l }))));
-
-  const tick = () => {
-    const d = target - Date.now();
-    if (d <= 0) {
-      clearInterval(timer);
-      const text = d > -6 * 3600e3 ? "Es hoy." : "Ya fue.";
-      box.replaceWith(el("p", { class: "countdown__done", text }));
-      return;
-    }
-    const parts = [Math.floor(d / 864e5), Math.floor(d / 36e5) % 24, Math.floor(d / 6e4) % 60, Math.floor(d / 1e3) % 60];
-    parts.forEach((v, i) => { nums[i].textContent = String(v).padStart(2, "0"); });
-  };
-  const timer = setInterval(tick, 1000);
-  tick();
-  return box;
-}
-
-function addToCalendar(gift) {
-  const s = gift.show;
-  const start = new Date(s.puertas);
-  const end = new Date(new Date(s.inicio).getTime() + 150 * 60e3);
-  const stamp = (d) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  const title = `${s.artista} · ${s.gira}`;
-  const where = `${s.lugar}, ${s.direccion}`;
-  const details = `Puertas ${hour(s.puertas)} · Show ${hour(s.inicio)} · ${s.sector}`;
-
-  const ua = navigator.userAgent;
-  const apple = /iPad|iPhone|iPod|Macintosh/.test(ua) && !/Android/.test(ua);
-  if (!apple) {
-    const url = new URL("https://calendar.google.com/calendar/render");
-    url.search = new URLSearchParams({ action: "TEMPLATE", text: title, dates: `${stamp(start)}/${stamp(end)}`, location: where, details });
-    window.open(url, "_blank", "noopener");
-    return;
-  }
-
-  const esc = (t) => t.replace(/[\\,;]/g, (m) => `\\${m}`);
-  const ics = [
-    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Regalo Lu//ES", "CALSCALE:GREGORIAN",
-    "BEGIN:VEVENT",
-    `UID:${stamp(start)}-regalo-lu`,
-    `DTSTAMP:${stamp(new Date())}`,
-    `DTSTART:${stamp(start)}`,
-    `DTEND:${stamp(end)}`,
-    `SUMMARY:${esc(title)}`,
-    `LOCATION:${esc(where)}`,
-    `DESCRIPTION:${esc(details)}`,
-    "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Mañana es el show", "TRIGGER:-P1D", "END:VALARM",
-    "END:VEVENT", "END:VCALENDAR",
-  ].join("\r\n");
-  const link = el("a", { href: URL.createObjectURL(new Blob([ics], { type: "text/calendar" })), download: "show.ics" });
-  document.body.append(link);
-  link.click();
-  link.remove();
-}
-
 /* ───────── Inicio ───────── */
 
 const saved = store.get();
 if (saved?.gift) {
+  // recarga: el cuaderno se rearma ya abierto en la hoja donde estaba
+  state = saved;
   $("#page-lock").hidden = true;
-  $("#page-letter").hidden = true;
-  prepareGift(saved.gift, { key: saved.key, revealed: Boolean(saved.revealed), answered: Boolean(saved.answered) }).start();
-  pastePhotos(saved.gift, saved.key);
+  const pages = buildBook(state.gift, true);
+  const at = Math.min(state.page || 0, pages.length - 1);
+  pages.slice(0, at).forEach((p) => {
+    p.el.classList.add("is-turned");
+    p.el.hidden = true;
+  });
+  book.index = at;
+  pages[at].onEnter?.();
 } else {
   initLock();
 }

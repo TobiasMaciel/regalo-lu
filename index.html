@@ -23,30 +23,10 @@
   <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
 
   <main class="stage">
-    <!-- Un solo cuaderno: las hojas están apiladas y al girar una aparece la de abajo -->
+    <!-- Todo pasa adentro del cuaderno. Las demás hojas se arman al abrirlo,
+         apiladas debajo de esta: al girar una, aparece la de abajo. -->
     <div class="book" id="book">
-      <!-- Hoja 3: la entrada pegada -->
-      <section class="notebook page page--gift is-bottom" id="page-gift" aria-label="Tu regalo">
-        <div class="glued" id="glued" hidden>
-          <div class="ticket-wrap is-covered" id="ticket-wrap">
-            <div class="ticket" id="ticket"></div>
-            <canvas class="scratch" id="scratch" aria-hidden="true"></canvas>
-          </div>
-          <span class="tape tape--tl" aria-hidden="true"></span>
-          <span class="tape tape--br" aria-hidden="true"></span>
-        </div>
-        <p class="page__note" id="gift-note" hidden>Rascá la entrada</p>
-      </section>
-
-      <!-- Hoja 2: la carta -->
-      <section class="notebook notebook--lined page page--letter" id="page-letter" aria-label="Carta">
-        <p class="paper__date" id="paper-date"></p>
-        <p class="paper__greeting" id="paper-greeting"></p>
-        <div class="paper__lines" id="intro-lines" aria-live="polite"></div>
-      </section>
-
-      <!-- Hoja 1: el candado -->
-      <section class="notebook page page--lock" id="page-lock" aria-labelledby="lock-title">
+      <section class="notebook page page--lock is-bottom" id="page-lock" aria-labelledby="lock-title">
         <h1 class="lock__title" id="lock-title">Para Lu</h1>
 
         <form class="code" id="code-form" novalidate onsubmit="event.preventDefault()">
@@ -65,16 +45,6 @@
         <p class="lock__hint" id="lock-hint" hidden>Hay una palabra escondida en la carta.<br>Buscá las letras resaltadas.</p>
       </section>
     </div>
-
-    <nav class="book-nav" id="book-nav" aria-label="Hojas del cuaderno" hidden>
-      <button class="book-nav__btn" id="nav-prev" type="button" aria-label="Hoja anterior">‹</button>
-      <span class="book-nav__count" id="nav-count"></span>
-      <button class="book-nav__btn book-nav__btn--next" id="nav-next" type="button">Pasar la hoja ›</button>
-    </nav>
-
-    <button class="btn btn--ghost book__next" id="intro-next" type="button" hidden>Seguir</button>
-    <button class="link-btn" id="scratch-skip" type="button" hidden>¿No te deja rascar? Tocá acá</button>
-    <div class="gift__rest" id="gift-rest"></div>
   </main>
 </body>
 </html>
