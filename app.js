@@ -129,7 +129,7 @@ async function turnTo(target) {
     await turnAway(pages[book.index].el);
   } else {
     const page = pages[target].el;
-    page.hidden = false;
+    page.classList.remove("is-gone");
     void page.offsetWidth; // que arranque girada para animar la vuelta
     page.classList.add("is-turning");
     page.classList.remove("is-turned");
@@ -142,12 +142,13 @@ async function turnTo(target) {
   pages[target].onEnter?.();
 }
 
-// La hoja gira sobre la espiral y deja ver la que ya estaba abajo
+// La hoja gira sobre la espiral y deja ver la que ya estaba abajo.
+// Sigue ocupando su lugar (solo se vuelve invisible) para que el cuaderno no cambie de tamaño.
 async function turnAway(page) {
   page.classList.add("is-turning", "is-turned");
   await sleep(TURN_MS);
   page.classList.remove("is-turning");
-  page.hidden = true;
+  page.classList.add("is-gone");
 }
 
 // deslizar para pasar de hoja; si fue un deslizamiento, no cuenta como toque
@@ -354,7 +355,7 @@ function letterPage(gift, frame, restoring) {
   const page = makePage("notebook--lined page--letter", "Carta");
   const lines = el("div", { class: "paper__lines", "aria-live": "polite" });
   page.body.append(
-    el("p", { class: "paper__date", text: new Intl.DateTimeFormat("es-AR", { timeZone: TZ, day: "numeric", month: "long", year: "numeric" }).format(new Date()) }),
+    el("p", { class: "paper__date", text: gift.fecha }),
     el("p", { class: "paper__greeting", text: `${gift.nombre}:` }),
     lines);
   if (frame) page.el.append(el("div", { class: "stuck stuck--letter" }, frame));
@@ -730,7 +731,7 @@ function setlistPage(gift) {
     el("h2", { class: "page__title", text: "Para ir escuchando" }),
     el("ol", { class: "setlist" },
       gift.canciones.map((song, i) => el("li", {},
-        el("a", { href: `https://open.spotify.com/search/${encodeURIComponent(`${s.artista} ${song}`)}`, target: "_blank", rel: "noopener" },
+        el("a", { href: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${s.artista} ${song}`)}`, target: "_blank", rel: "noopener" },
           el("span", { class: "setlist__n", text: String(i + 1).padStart(2, "0") }),
           el("span", { class: "setlist__t", text: song }),
           el("span", { class: "setlist__play", html: ICON.play }))))));
@@ -927,13 +928,10 @@ const saved = store.get();
 if (saved?.gift) {
   // recarga: el cuaderno se rearma ya abierto en la hoja donde estaba
   state = saved;
-  $("#page-lock").hidden = true;
+  $("#page-lock").classList.add("is-turned", "is-gone");
   const pages = buildBook(state.gift, true);
   const at = Math.min(state.page || 0, pages.length - 1);
-  pages.slice(0, at).forEach((p) => {
-    p.el.classList.add("is-turned");
-    p.el.hidden = true;
-  });
+  pages.slice(0, at).forEach((p) => p.el.classList.add("is-turned", "is-gone"));
   book.index = at;
   pages[at].onEnter?.();
 } else {

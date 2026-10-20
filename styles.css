@@ -173,6 +173,7 @@ body::after {
   pointer-events: none;
 }
 .page.is-turning { box-shadow: 30px 0 40px -20px rgba(0, 0, 0, .35); }
+.page.is-gone { visibility: hidden; }
 
 .page__body {
   flex: 1;
