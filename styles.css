@@ -22,9 +22,9 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html, body { margin: 0; }
+/* el cuaderno entra entero en la pantalla: nada de scroll ni de "tirar para recargar" */
+html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; }
 body {
-  min-height: 100svh;
   background: var(--desk);
   color: var(--on-desk);
   font-family: var(--serif);
@@ -61,14 +61,22 @@ body::after {
 .stage {
   position: relative;
   z-index: 1;
-  min-height: 100svh;
+  height: 100%;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: calc(20px + env(safe-area-inset-top, 0px)) 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
   text-align: center;
 }
+
+/* El cuaderno tiene un tamaño fijo de diseño (382×680) y se escala para entrar en cualquier pantalla.
+   .fit ocupa el tamaño ya escalado; --fit lo calcula app.js. */
+.fit {
+  position: relative;
+  width: calc(10px + 382px * var(--fit, 1));
+  height: calc(680px * var(--fit, 1));
+}
+.is-loading .book { visibility: hidden; animation: none; }
 
 /* ───────── Botones ───────── */
 .btn {
@@ -103,13 +111,18 @@ body::after {
 /* ───────── El cuaderno ───────── */
 .book {
   --spiral-top: 18px;
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 10px; /* lugar para la espiral */
   display: grid;
-  width: min(100%, 440px);
-  margin-left: 10px; /* lugar para la espiral */
-  touch-action: pan-y;
-  /* se inclina apenas con el mouse o el celular (--tx/--ty desde JS) */
-  transform: perspective(1400px) rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg));
+  grid-template-rows: 680px;
+  width: 382px;
+  height: 680px;
+  touch-action: none; /* el dedo arrastra la hoja; el navegador no se lo roba para scrollear */
+  /* escala a la pantalla + leve inclinación con el mouse (--tx/--ty desde JS) */
+  transform-origin: 0 0;
+  transform: scale(var(--fit, 1)) translate(191px, 340px) perspective(1400px)
+             rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg)) translate(-191px, -340px);
   transition: transform .6s var(--ease-out);
   /* entra deslizándose al abrir la página */
   animation: book-in 1s var(--ease-out) both;
@@ -146,10 +159,13 @@ body::after {
   width: 12px;
   background: radial-gradient(circle at 6px 11px, #1b1a19 3.6px, rgba(0, 0, 0, .25) 4.4px, transparent 5px) 0 0 / 12px 22px repeat-y;
 }
-.notebook--lined {
-  background:
-    repeating-linear-gradient(to bottom, transparent 0 39px, var(--rule) 39px 40px) 0 98px / 100% calc(100% - 160px) no-repeat,
-    var(--grain), var(--page);
+/* renglones: van en el mismo bloque que el texto y con su mismo interlineado,
+   así cada línea de texto queda apoyada sobre su renglón */
+.ruled {
+  --lh: 40px;
+  --base: 31px; /* dónde cae la base de la letra dentro de cada renglón */
+  background: repeating-linear-gradient(to bottom,
+    transparent 0 var(--base), var(--rule) var(--base) calc(var(--base) + 1px), transparent calc(var(--base) + 1px) var(--lh));
 }
 
 /* hojas apiladas en la misma celda: al girar una aparece la de abajo */
@@ -157,7 +173,8 @@ body::after {
   grid-area: 1 / 1;
   display: flex;
   flex-direction: column;
-  min-height: min(84svh, 680px);
+  min-height: 0;
+  height: 680px;
   overflow: hidden; /* nada de una hoja asoma por debajo de la de arriba */
   isolation: isolate; /* cada hoja es su propia capa: lo de una hoja de abajo nunca tapa a la de arriba */
   user-select: none; /* arrastrar la hoja no selecciona texto */
@@ -177,7 +194,7 @@ body::after {
 }
 .page:not(.is-bottom) { box-shadow: 0 1px 2px rgba(0, 0, 0, .18); }
 .page.is-turned {
-  transform: perspective(2200px) rotateY(-180deg);
+  transform: perspective(1500px) rotateY(-180deg);
   pointer-events: none;
 }
 .page.is-turning, .page.is-dragging { box-shadow: 30px 0 40px -20px rgba(0, 0, 0, .35); }
@@ -256,16 +273,11 @@ body::after {
 }
 
 /* ───────── La carta escrita (portada) ───────── */
-.page--intro { padding-top: 22px; padding-bottom: 26px; cursor: pointer; }
-.page--intro.notebook--lined {
-  background:
-    repeating-linear-gradient(to bottom, transparent 0 27px, var(--rule) 27px 28px) 0 132px / 100% calc(100% - 150px) no-repeat,
-    var(--grain), var(--page);
-}
+.page--intro { padding-top: 22px; padding-bottom: 18px; cursor: pointer; }
 .intro__title {
   margin: 0;
   text-align: center;
-  font: 400 clamp(46px, 13vw, 58px)/1 var(--serif);
+  font: 400 52px/1 var(--serif);
   letter-spacing: .02em;
   color: var(--ink);
 }
@@ -278,8 +290,11 @@ body::after {
   color: var(--ink-soft);
 }
 .intro__text {
+  --lh: 28px;
+  --base: 21px;
+  flex: 1; /* los renglones siguen hasta el final de la hoja */
   margin: 0;
-  font: italic 400 clamp(16px, 4.6vw, 19px)/28px var(--serif);
+  font: italic 400 17px/28px var(--serif);
   color: var(--ink);
   text-indent: 1.4em;
 }
@@ -294,7 +309,7 @@ body::after {
 }
 .lock__title {
   margin: 0 0 34px;
-  font: italic 500 clamp(58px, 17vw, 78px)/1 var(--serif);
+  font: italic 500 68px/1 var(--serif);
   letter-spacing: -.01em;
   color: var(--ink);
 }
@@ -312,18 +327,18 @@ body::after {
 }
 .code__tiles {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: clamp(8px, 3vw, 14px);
+  grid-template-columns: repeat(var(--n, 6), 1fr);
+  gap: 10px;
 }
 /* cada casilla es un renglón donde la letra aparece en rojo, como en la carta */
 .tile {
   position: relative;
-  height: clamp(52px, 14vw, 62px);
+  height: 56px;
   display: grid;
   place-items: end center;
   padding-bottom: 2px;
   border-bottom: 1.5px solid rgba(36, 35, 34, .4);
-  font: 600 clamp(34px, 10vw, 44px)/1 var(--serif);
+  font: 600 40px/1 var(--serif);
   color: var(--mark); /* las letras se escriben en rojo, como en la carta */
   transition: border-color .2s;
 }
@@ -400,18 +415,19 @@ body::after {
 /* ───────── La carta ───────── */
 .page--letter { cursor: pointer; }
 .paper__date {
-  margin: 0 0 22px;
+  margin: 0 0 14px;
   text-align: right;
   font: italic 400 18px/1 var(--serif);
   color: var(--ink-faint);
 }
+.paper__ruled { flex: 1; }
 .paper__greeting {
-  margin: 0 0 4px;
+  margin: 0;
   font: italic 600 32px/40px var(--serif);
 }
 .paper__lines p {
   margin: 0;
-  font: italic 400 clamp(24px, 6.6vw, 28px)/40px var(--serif);
+  font: italic 400 26px/40px var(--serif);
   color: var(--ink);
 }
 .ink__w { display: inline-block; white-space: nowrap; }
@@ -435,8 +451,8 @@ body::after {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
-/* la entrada se pega girando al llegar a la hoja */
-.page.is-current .glued { animation: glue-in .9s .2s var(--ease-out) both; }
+/* la entrada se pega girando la primera vez que se llega a la hoja */
+.page.is-current:not(.is-seen) .glued { animation: glue-in .9s .2s var(--ease-out) both; }
 @keyframes glue-in { from { opacity: 0; transform: translateY(-26px) rotate(-8deg) scale(1.06); } }
 .page--gift .ticket-wrap { cursor: pointer; }
 
@@ -533,7 +549,7 @@ body::after {
 }
 .ticket__artist {
   margin: 8px 0 1px;
-  font: 700 clamp(20px, 6.6vw, 27px)/1 var(--mono);
+  font: 700 25px/1 var(--mono);
   letter-spacing: -.02em;
   text-transform: uppercase;
 }
@@ -551,7 +567,7 @@ body::after {
   padding: 6px 0;
   border-top: 1px solid rgba(29, 28, 27, .18);
   border-bottom: 1px solid rgba(29, 28, 27, .18);
-  font: 700 clamp(14px, 4.2vw, 17px)/1.1 var(--mono);
+  font: 700 16px/1.1 var(--mono);
   text-transform: uppercase;
 }
 .ticket__when span:last-child { margin-left: auto; color: var(--pen); }
@@ -607,7 +623,7 @@ body::after {
 
 .question__text {
   margin: 0 0 26px;
-  font: italic 500 clamp(56px, 16vw, 72px)/1 var(--serif);
+  font: italic 500 66px/1 var(--serif);
   color: var(--ink);
 }
 .question__actions {
@@ -620,7 +636,7 @@ body::after {
 }
 .question__actions .btn { min-width: 112px; }
 .q-ch { display: inline-block; }
-.page.is-current .q-ch { animation: q-in .6s calc(var(--i) * 60ms + 350ms) var(--ease-spring) both; }
+.page.is-current:not(.is-seen) .q-ch { animation: q-in .6s calc(var(--i) * 60ms + 350ms) var(--ease-spring) both; }
 @keyframes q-in { from { opacity: 0; transform: translateY(20px) rotate(-8deg); } }
 .question .btn--wax { animation: heartbeat 1.8s 1.4s ease-in-out infinite; }
 @keyframes heartbeat {
@@ -636,7 +652,7 @@ body::after {
 
 .answer__yes {
   margin: 0 0 26px;
-  font: italic 500 clamp(32px, 9vw, 40px)/1.15 var(--serif);
+  font: italic 500 36px/1.15 var(--serif);
   text-wrap: balance;
 }
 .answer__label {
@@ -660,7 +676,7 @@ body::after {
 }
 .countdown__num {
   display: block;
-  font: 600 clamp(28px, 9vw, 38px)/1 var(--serif);
+  font: 600 34px/1 var(--serif);
   font-variant-numeric: lining-nums tabular-nums;
 }
 .countdown__label {
@@ -743,8 +759,10 @@ body::after {
   -webkit-user-drag: none;
 }
 .polaroid.is-loading img { animation: pulse 1.4s ease-in-out infinite; }
-/* al quedar la hoja arriba, las polaroids caen y se pegan una por una */
-.page.is-current .polaroid { animation: stick .75s calc(var(--i, 0) * 150ms + 250ms) var(--ease-out) both; }
+/* la primera vez que la hoja queda arriba, las polaroids caen y se pegan una por una.
+   Hasta entonces no se ven: así no "parpadean" mientras se revela la hoja de abajo. */
+.page:not(.is-current):not(.is-seen) :is(.polaroid, .glued, .q-ch, .closing, .closing__sign) { opacity: 0; }
+.page.is-current:not(.is-seen) .polaroid { animation: stick .75s calc(var(--i, 0) * 150ms + 250ms) var(--ease-out) both; }
 @keyframes stick {
   from {
     opacity: 0;
@@ -808,7 +826,7 @@ body::after {
 .stuck--final { width: min(60%, 240px); margin-bottom: 30px; }
 .closing {
   margin: 0 0 6px;
-  font: italic 500 clamp(40px, 12vw, 52px)/1.1 var(--serif);
+  font: italic 500 48px/1.1 var(--serif);
   color: var(--ink);
 }
 .closing__sign {
@@ -816,8 +834,8 @@ body::after {
   font: italic 600 28px/1 var(--serif);
   color: var(--pen);
 }
-.page.is-current .closing { animation: rise-in 1s .3s var(--ease-out) both; }
-.page.is-current .closing__sign { animation: rise-in 1s .8s var(--ease-out) both; }
+.page.is-current:not(.is-seen) .closing { animation: rise-in 1s .3s var(--ease-out) both; }
+.page.is-current:not(.is-seen) .closing__sign { animation: rise-in 1s .8s var(--ease-out) both; }
 .heart {
   position: absolute;
   bottom: 40px;
@@ -916,9 +934,128 @@ body::after {
   z-index: 100;
 }
 
-@media (min-width: 720px) {
-  .notebook { padding-right: 36px; }
-  .page--gift { padding-right: 28px; }
+/* ───────── Quiz ───────── */
+.page--quiz .page__body { justify-content: center; }
+.quiz__progress {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+.quiz__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(36, 35, 34, .15);
+  transition: background .3s, transform .3s var(--ease-spring);
+}
+.quiz__dot.is-done { background: var(--pen); }
+.quiz__dot.is-now { transform: scale(1.4); background: var(--ink-soft); }
+.quiz__q {
+  margin: 0 0 22px;
+  text-align: center;
+  font: italic 600 30px/1.15 var(--serif);
+  text-wrap: balance;
+}
+.quiz__opts { display: grid; gap: 10px; }
+.quiz__opt {
+  appearance: none;
+  width: 100%;
+  padding: 13px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .45);
+  box-shadow: inset 0 0 0 1.5px rgba(36, 35, 34, .18);
+  font: 500 20px/1.2 var(--serif);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background .25s, box-shadow .25s, transform .2s, opacity .3s;
+}
+.quiz__opt:active { transform: scale(.98); }
+.quiz__opt.is-right { background: var(--pen); color: #fff6f8; box-shadow: none; animation: pop .45s var(--ease-spring); }
+.quiz__opt.is-wrong { opacity: .45; animation: shake .45s; text-decoration: line-through; }
+@keyframes pop { 50% { transform: scale(1.04); } }
+.quiz__step { animation: rise-in .6s var(--ease-out) both; }
+.quiz__end { text-align: center; animation: rise-in .8s var(--ease-out) both; }
+.quiz__end strong { display: block; font: italic 600 44px/1.1 var(--serif); }
+.quiz__end span { font: italic 400 22px/1.3 var(--serif); color: var(--ink-soft); }
+
+/* ───────── Pringles ───────── */
+.page--pringles .page__body { align-items: center; justify-content: center; text-align: center; }
+.pringles__text {
+  margin: 0 0 6px;
+  font: italic 500 26px/1.2 var(--serif);
+  text-wrap: balance;
+}
+/* lata dibujada (genérica): se mueve al tocarla */
+.can {
+  position: relative;
+  width: 92px;
+  height: 172px;
+  margin: 18px auto 26px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transform-origin: 50% 100%;
+}
+.can__body {
+  position: absolute;
+  inset: 12px 0 0;
+  border-radius: 10px / 8px;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, .28), transparent 22%, rgba(255, 255, 255, .28) 38%, transparent 55%, rgba(0, 0, 0, .3)),
+    linear-gradient(180deg, #d42a2a, #b51d1d);
+  box-shadow: 0 16px 22px -12px rgba(0, 0, 0, .5);
+}
+.can__body::before { /* etiqueta */
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 54px;
+  height: 54px;
+  margin: -27px 0 0 -27px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #fff6e0, #f2deb0);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, .25);
+}
+.can__body::after { /* bigotes */
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 34px;
+  height: 9px;
+  margin-left: -17px;
+  border-radius: 0 0 50% 50%;
+  background: #3a2414;
+}
+.can__lid {
+  position: absolute;
+  inset: 0 -3px auto;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 40%, #fbfbfb, #d7d7d7 70%, #b9b9b9);
+  box-shadow: 0 2px 2px rgba(0, 0, 0, .2);
+}
+.can.is-wobbling { animation: wobble .7s var(--ease-out); }
+@keyframes wobble {
+  20% { transform: rotate(-9deg) translateY(-6px); }
+  45% { transform: rotate(7deg) translateY(-10px); }
+  70% { transform: rotate(-3deg); }
+}
+.can.is-lifted { animation: lift 1.2s var(--ease-out) both; }
+@keyframes lift { 40% { transform: translateY(-28px) rotate(-4deg); } 100% { transform: none; } }
+.page.is-current:not(.is-seen) .can { animation: can-in .9s .25s var(--ease-spring) both; }
+@keyframes can-in { from { opacity: 0; transform: translateY(-40px) rotate(-12deg); } }
+.pringles__field { width: min(100%, var(--w, 220px)); }
+.pringles__ok {
+  margin: 18px 0 0;
+  font: italic 600 26px/1.25 var(--serif);
+  color: var(--pen);
+  animation: rise-in .8s var(--ease-out) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

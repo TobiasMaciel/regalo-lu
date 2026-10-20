@@ -126,10 +126,28 @@ function setReady(page) {
   page.corner.classList.add("is-new");
 }
 
-// la hoja que queda arriba reproduce su animación de llegada (polaroids que se pegan, etc.)
+// La hoja que queda arriba reproduce su animación de llegada (polaroids que se pegan, etc.) solo la
+// primera vez; al dejarla queda marcada como vista y su contenido ya no se esconde ni se anima de nuevo.
 function setCurrent(i) {
-  book.pages.forEach((p, j) => p.el.classList.toggle("is-current", j === i));
+  book.pages.forEach((p, j) => {
+    if (j === i) p.el.classList.add("is-current");
+    else if (p.el.classList.contains("is-current")) p.el.classList.replace("is-current", "is-seen");
+  });
 }
+
+// El cuaderno tiene tamaño fijo de diseño y se escala para entrar entero en la pantalla
+let fitScale = 1;
+function fitBook() {
+  const W = 392;
+  const H = 680;
+  const vw = window.visualViewport?.width ?? innerWidth;
+  const vh = window.visualViewport?.height ?? innerHeight;
+  fitScale = Math.min((vw - 20) / W, (vh - 28) / H, 1.25);
+  $("#fit").style.setProperty("--fit", fitScale.toFixed(4));
+}
+fitBook();
+addEventListener("resize", fitBook);
+window.visualViewport?.addEventListener("resize", fitBook);
 
 /* Giro de hoja: 0 = abierta, 1 = dada vuelta sobre la espiral.
    Las hojas giradas siguen ocupando su lugar (solo se vuelven invisibles)
@@ -181,10 +199,10 @@ async function turnTo(target, { from } = {}) {
 
 // Arrastrar la hoja con el dedo: sigue al dedo en 3D y al soltar termina de girar o vuelve
 (() => {
-  const NO_DRAG = "button, a, input, .scratch, .glued, .question__actions, .code, dialog";
+  const NO_DRAG = "button, a, input, .scratch, .glued, .question__actions, .code, .code__field, dialog";
   const clamp = (v) => Math.min(1, Math.max(0, v));
   let d = null;
-  let suppressClick = false;
+  let draggedAt = -1e9; // el "click" que el navegador dispara al soltar un arrastre no debe contar como toque
 
   bookEl.addEventListener("pointerdown", (e) => {
     if (book.busy || !book.pages.length || e.button > 0 || e.target.closest(NO_DRAG)) return;
@@ -201,7 +219,8 @@ async function turnTo(target, { from } = {}) {
       const i = book.index;
       const forward = dx < 0;
       if (forward ? i >= book.pages.length - 1 || !book.pages[i].ready : i === 0) { d = null; return; }
-      Object.assign(d, { active: true, forward, page: (forward ? book.pages[i] : book.pages[i - 1]).el, width: bookEl.offsetWidth });
+      // ancho en pantalla (ya escalado), para que la hoja siga al dedo 1 a 1
+      Object.assign(d, { active: true, forward, page: (forward ? book.pages[i] : book.pages[i - 1]).el, width: bookEl.offsetWidth * fitScale });
       book.busy = true;
       d.page.classList.remove("is-gone");
       d.page.classList.add("is-dragging");
@@ -219,7 +238,7 @@ async function turnTo(target, { from } = {}) {
     const drag = d;
     d = null;
     if (!drag.active || drag.p == null) { book.busy = false; return; }
-    suppressClick = true;
+    draggedAt = performance.now();
     drag.page.classList.remove("is-dragging");
     const i = book.index;
     const done = drag.forward ? drag.p > .28 : drag.p < .72;
@@ -237,8 +256,7 @@ async function turnTo(target, { from } = {}) {
   bookEl.addEventListener("pointerup", end);
   bookEl.addEventListener("pointercancel", end);
   bookEl.addEventListener("click", (e) => {
-    if (!suppressClick) return;
-    suppressClick = false;
+    if (performance.now() - draggedAt > 350) return;
     e.preventDefault();
     e.stopPropagation();
   }, true);
@@ -278,26 +296,14 @@ const paperSound = (() => {
   };
 })();
 
-// El cuaderno se inclina apenas siguiendo el mouse (o el celular, donde no pide permiso)
+// En la compu, el cuaderno se inclina apenas siguiendo el mouse (en el celular queda quieto)
 (() => {
-  if (reduceMotion) return;
-  const tilt = (x, y) => {
-    bookEl.style.setProperty("--ty", `${x.toFixed(2)}deg`);
-    bookEl.style.setProperty("--tx", `${y.toFixed(2)}deg`);
-  };
-  const lim = (v, m) => Math.min(m, Math.max(-m, v));
-  if (matchMedia("(hover: hover)").matches) {
-    addEventListener("pointermove", (e) => {
-      if (e.pointerType === "mouse") tilt((e.clientX / innerWidth - .5) * 6, -(e.clientY / innerHeight - .5) * 5);
-    });
-  } else if ("DeviceOrientationEvent" in window && typeof DeviceOrientationEvent.requestPermission !== "function") {
-    let base = null;
-    addEventListener("deviceorientation", (e) => {
-      if (e.gamma == null || e.beta == null) return;
-      base ??= { g: e.gamma, b: e.beta };
-      tilt(lim((e.gamma - base.g) * .25, 5), lim(-(e.beta - base.b) * .2, 4));
-    });
-  }
+  if (reduceMotion || !matchMedia("(hover: hover)").matches) return;
+  addEventListener("pointermove", (e) => {
+    if (e.pointerType !== "mouse") return;
+    bookEl.style.setProperty("--ty", `${((e.clientX / innerWidth - .5) * 6).toFixed(2)}deg`);
+    bookEl.style.setProperty("--tx", `${(-(e.clientY / innerHeight - .5) * 5).toFixed(2)}deg`);
+  });
 })();
 
 function buildBook(gift, restoring) {
@@ -311,10 +317,12 @@ function buildBook(gift, restoring) {
     letterPage(gift, photos.frames[0], restoring),
     ticketPage(gift, photos.frames[1]),
     questionPage(gift),
+    gift.quiz?.length ? quizPage(gift) : null,
+    gift.pringles?.codigo ? pringlesPage(gift) : null,
     setlistPage(gift),
     ...middle.map((frames) => photoPage(frames)),
     finalPage(gift, n > 2 ? photos.frames[n - 1] : null),
-  ];
+  ].filter(Boolean);
 
   // cada hoja nueva va debajo de la anterior (en el DOM, antes = más abajo)
   let above = $("#page-lock");
@@ -487,8 +495,10 @@ function letterPage(gift, frame, restoring) {
   const lines = el("div", { class: "paper__lines", "aria-live": "polite" });
   page.body.append(
     el("p", { class: "paper__date", text: gift.fecha }),
-    el("p", { class: "paper__greeting", text: `${gift.nombre}:` }),
-    lines);
+    // el saludo y las líneas comparten renglones: cada línea queda apoyada sobre el suyo
+    el("div", { class: "paper__ruled ruled" },
+      el("p", { class: "paper__greeting", text: `${gift.nombre}:` }),
+      lines));
   if (frame) page.el.append(el("div", { class: "stuck stuck--letter" }, frame));
 
   if (restoring) {
@@ -771,8 +781,9 @@ function questionPage(gift) {
       y = Math.random() * maxY;
     } while (++tries < 200 && (overYes(x, y) || Math.hypot(x - (b.left - box.left), y - (b.top - box.top)) < 70));
     no.classList.add("is-running");
-    no.style.left = `${x}px`;
-    no.style.top = `${y}px`;
+    // las medidas son de pantalla; el cuaderno está escalado
+    no.style.left = `${x / fitScale}px`;
+    no.style.top = `${y / fitScale}px`;
     vibrate(12);
   };
   no.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") run(e); });
@@ -872,6 +883,175 @@ function addToCalendar(gift) {
   document.body.append(link);
   link.click();
   link.remove();
+}
+
+/* ───────── Hoja: quiz ───────── */
+
+function quizPage(gift) {
+  const page = makePage("page--quiz", "Quiz");
+  const qs = gift.quiz;
+  const dots = qs.map(() => el("span", { class: "quiz__dot" }));
+  const stage = el("div", { class: "quiz__stage", "aria-live": "polite" });
+  page.body.append(el("div", { class: "quiz__progress", "aria-hidden": "true" }, dots), stage);
+
+  const end = () => {
+    dots.forEach((d) => { d.classList.add("is-done"); d.classList.remove("is-now"); });
+    stage.replaceChildren(el("div", { class: "quiz__end" },
+      el("strong", { text: gift.quizFinal?.titulo ?? "¡Perfecto!" }),
+      el("span", { text: gift.quizFinal?.texto ?? "Las respondiste todas." })));
+  };
+  if (state.quiz) {
+    end();
+    return page;
+  }
+
+  page.ready = false;
+  // una pregunta por vez; si se equivoca, esa opción tiembla y se tacha, y puede seguir intentando
+  const show = (n) => {
+    if (n >= qs.length) {
+      end();
+      save({ quiz: true });
+      const r = stage.getBoundingClientRect();
+      confetti.burst(r.left + r.width / 2, r.top + r.height / 2, 120);
+      vibrate([30, 40, 90]);
+      setReady(page);
+      return;
+    }
+    dots.forEach((d, i) => {
+      d.classList.toggle("is-done", i < n);
+      d.classList.toggle("is-now", i === n);
+    });
+    const q = qs[n];
+    let locked = false;
+    const opts = q.opciones.map((text, i) => {
+      const b = el("button", { class: "quiz__opt", type: "button", text });
+      b.addEventListener("click", () => {
+        if (locked || b.classList.contains("is-wrong")) return;
+        if (i === q.correcta) {
+          locked = true;
+          b.classList.add("is-right");
+          vibrate(20);
+          setTimeout(() => show(n + 1), 900);
+        } else {
+          b.classList.add("is-wrong");
+          vibrate([40, 30, 40]);
+        }
+      });
+      return b;
+    });
+    stage.replaceChildren(el("div", { class: "quiz__step" },
+      el("p", { class: "quiz__q", text: q.pregunta }),
+      el("div", { class: "quiz__opts" }, opts)));
+  };
+  show(0);
+  return page;
+}
+
+/* ───────── Hoja: la lata de Pringles ───────── */
+
+// Casillas de código (una por carácter) sobre un único input real, como las del candado
+function codeField(len, numeric) {
+  const tilesBox = el("div", { class: "code__tiles", "aria-hidden": "true" });
+  tilesBox.style.setProperty("--n", len);
+  const tiles = Array.from({ length: len }, (_, i) => {
+    const t = el("span", { class: "tile" });
+    t.style.setProperty("--i", i);
+    return t;
+  });
+  tilesBox.append(...tiles);
+  const input = el("input", {
+    class: "code__input", type: "text", inputmode: numeric ? "numeric" : "text", maxlength: len,
+    autocomplete: "off", autocapitalize: "characters", autocorrect: "off", spellcheck: "false", "aria-label": "Código",
+  });
+  const wrap = el("div", { class: "code__field pringles__field" }, tilesBox, input);
+  wrap.style.setProperty("--w", `${Math.min(300, len * 52)}px`);
+
+  let focused = false;
+  const clean = (v) => normalizePassword(v).replace(numeric ? /[^0-9]/g : /[^A-Z0-9]/g, "").slice(0, len);
+  const render = () => {
+    const v = input.value;
+    tiles.forEach((t, i) => {
+      t.textContent = v[i] ?? "";
+      t.classList.toggle("is-filled", Boolean(v[i]));
+      t.classList.toggle("is-active", focused && i === Math.min(v.length, len - 1));
+    });
+  };
+  const api = {
+    el: wrap,
+    tilesBox,
+    input,
+    onComplete: null,
+    set(v) { input.value = v; render(); },
+  };
+  input.addEventListener("input", () => {
+    const v = clean(input.value);
+    if (v !== input.value) input.value = v;
+    tilesBox.classList.remove("is-error");
+    render();
+    if (v.length === len) setTimeout(() => api.onComplete?.(v), 200);
+  });
+  input.addEventListener("focus", () => { focused = true; render(); });
+  input.addEventListener("blur", () => { focused = false; render(); });
+  render();
+  return api;
+}
+
+function pringlesPage(gift) {
+  const page = makePage("page--pringles", "Pringles");
+  const pr = gift.pringles;
+  const code = normalizePassword(String(pr.codigo)).replace(/[^A-Z0-9]/g, "");
+  const can = el("button", { class: "can", type: "button", "aria-label": "La lata" },
+    el("span", { class: "can__body" }), el("span", { class: "can__lid" }));
+  can.addEventListener("click", () => {
+    can.classList.remove("is-wobbling", "is-lifted");
+    void can.offsetWidth;
+    can.classList.add("is-wobbling");
+    vibrate(15);
+  });
+  const field = codeField(code.length, /^\d+$/.test(code));
+  const msg = el("p", { class: "code__msg", role: "status", "aria-live": "polite" });
+  const hint = el("p", { class: "lock__hint", text: pr.pista, hidden: true });
+  const hintBtn = el("button", { class: "hint-btn", type: "button", text: "¿Pista?" });
+  hintBtn.addEventListener("click", () => { hint.hidden = !hint.hidden; });
+  page.body.append(el("p", { class: "pringles__text", text: pr.texto }), can, field.el, msg, pr.pista ? hintBtn : null, hint);
+
+  const solved = () => {
+    field.set(code);
+    field.input.disabled = true;
+    field.tilesBox.classList.add("is-ok");
+    msg.remove();
+    hintBtn.remove();
+    hint.remove();
+    page.body.append(el("p", { class: "pringles__ok", text: pr.ok }));
+  };
+  if (state.pringles) {
+    solved();
+    return page;
+  }
+
+  page.ready = false;
+  const NOPE = ["Ese no es. Buscá bien.", "Tampoco. Mirá todos los lados de la lata.", "Casi… seguí buscando."];
+  let tries = 0;
+  field.onComplete = (v) => {
+    if (v === code) {
+      field.input.blur();
+      save({ pringles: true });
+      solved();
+      can.classList.add("is-lifted");
+      const r = can.getBoundingClientRect();
+      confetti.burst(r.left + r.width / 2, r.top, 130);
+      vibrate([30, 40, 90]);
+      setReady(page);
+      return;
+    }
+    msg.textContent = NOPE[tries++ % NOPE.length];
+    field.tilesBox.classList.remove("is-error");
+    void field.tilesBox.offsetWidth;
+    field.tilesBox.classList.add("is-error");
+    vibrate([60, 40, 60]);
+    setTimeout(() => { field.set(""); field.input.focus(); }, 650);
+  };
+  return page;
 }
 
 /* ───────── Hojas: canciones, fotos y cierre ───────── */
@@ -1123,6 +1303,11 @@ const confetti = (() => {
 
 /* ───────── Inicio ───────── */
 
+// el cuaderno aparece recién con las fuentes cargadas: nada de saltos ni letras que cambian
+const ready = Promise.race([document.fonts.ready, sleep(2000)]).then(() => {
+  document.documentElement.classList.remove("is-loading");
+});
+
 const saved = store.get();
 if (saved?.gift) {
   // recarga: el cuaderno se rearma ya abierto en la hoja donde estaba
@@ -1131,7 +1316,7 @@ if (saved?.gift) {
   $("#page-lock").classList.add("is-turned", "is-gone");
   const pages = buildBook(state.gift, true);
   const at = Math.min(state.page || 0, pages.length - 1);
-  pages.slice(0, at).forEach((p) => p.el.classList.add("is-turned", "is-gone"));
+  pages.slice(0, at).forEach((p) => p.el.classList.add("is-turned", "is-gone", "is-seen"));
   book.index = at;
   setCurrent(at);
   pages[at].onEnter?.();
@@ -1146,6 +1331,6 @@ if (saved?.gift) {
     turnAway(intro);
   };
   intro.addEventListener("click", turnIntro);
-  Promise.race([document.fonts.ready, sleep(1500)]).then(() => sleep(1300)).then(turnIntro);
+  ready.then(() => sleep(1800)).then(turnIntro);
 }
 })();
