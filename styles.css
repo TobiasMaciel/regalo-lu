@@ -761,7 +761,7 @@ body::after {
 .polaroid.is-loading img { animation: pulse 1.4s ease-in-out infinite; }
 /* la primera vez que la hoja queda arriba, las polaroids caen y se pegan una por una.
    Hasta entonces no se ven: así no "parpadean" mientras se revela la hoja de abajo. */
-.page:not(.is-current):not(.is-seen) :is(.polaroid, .glued, .q-ch, .closing, .closing__sign) { opacity: 0; }
+.page:not(.is-current):not(.is-seen) :is(.polaroid, .glued, .q-ch, .closing, .closing__sign, .box) { opacity: 0; }
 .page.is-current:not(.is-seen) .polaroid { animation: stick .75s calc(var(--i, 0) * 150ms + 250ms) var(--ease-out) both; }
 @keyframes stick {
   from {
@@ -934,126 +934,102 @@ body::after {
   z-index: 100;
 }
 
-/* ───────── Quiz ───────── */
-.page--quiz .page__body { justify-content: center; }
-.quiz__progress {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 22px;
-}
-.quiz__dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: rgba(36, 35, 34, .15);
-  transition: background .3s, transform .3s var(--ease-spring);
-}
-.quiz__dot.is-done { background: var(--pen); }
-.quiz__dot.is-now { transform: scale(1.4); background: var(--ink-soft); }
-.quiz__q {
-  margin: 0 0 22px;
-  text-align: center;
-  font: italic 600 30px/1.15 var(--serif);
-  text-wrap: balance;
-}
-.quiz__opts { display: grid; gap: 10px; }
-.quiz__opt {
-  appearance: none;
-  width: 100%;
-  padding: 13px 16px;
-  border: 0;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, .45);
-  box-shadow: inset 0 0 0 1.5px rgba(36, 35, 34, .18);
-  font: 500 20px/1.2 var(--serif);
-  color: var(--ink);
-  text-align: left;
-  cursor: pointer;
-  transition: background .25s, box-shadow .25s, transform .2s, opacity .3s;
-}
-.quiz__opt:active { transform: scale(.98); }
-.quiz__opt.is-right { background: var(--pen); color: #fff6f8; box-shadow: none; animation: pop .45s var(--ease-spring); }
-.quiz__opt.is-wrong { opacity: .45; animation: shake .45s; text-decoration: line-through; }
-@keyframes pop { 50% { transform: scale(1.04); } }
-.quiz__step { animation: rise-in .6s var(--ease-out) both; }
-.quiz__end { text-align: center; animation: rise-in .8s var(--ease-out) both; }
-.quiz__end strong { display: block; font: italic 600 44px/1.1 var(--serif); }
-.quiz__end span { font: italic 400 22px/1.3 var(--serif); color: var(--ink-soft); }
-
-/* ───────── Pringles ───────── */
-.page--pringles .page__body { align-items: center; justify-content: center; text-align: center; }
-.pringles__text {
+/* ───────── Te falta algo: el número escondido ───────── */
+.page--number .page__body { align-items: center; justify-content: center; text-align: center; }
+.number__title {
   margin: 0 0 6px;
-  font: italic 500 26px/1.2 var(--serif);
+  font: italic 600 40px/1.05 var(--serif);
+}
+.number__text {
+  margin: 0;
+  max-width: 24ch;
+  font: italic 400 22px/1.3 var(--serif);
+  color: var(--ink-soft);
   text-wrap: balance;
 }
-/* lata dibujada (genérica): se mueve al tocarla */
-.can {
+/* caja de regalo cerrada (dibujada con CSS) */
+.box {
   position: relative;
-  width: 92px;
-  height: 172px;
-  margin: 18px auto 26px;
+  width: 132px;
+  height: 128px;
+  margin: 26px auto 28px;
   padding: 0;
   border: 0;
   background: none;
   cursor: pointer;
   transform-origin: 50% 100%;
 }
-.can__body {
+.box__base {
   position: absolute;
-  inset: 12px 0 0;
-  border-radius: 10px / 8px;
+  left: 10px;
+  right: 10px;
+  bottom: 0;
+  height: 84px;
+  border-radius: 4px 4px 8px 8px;
   background:
-    linear-gradient(90deg, rgba(0, 0, 0, .28), transparent 22%, rgba(255, 255, 255, .28) 38%, transparent 55%, rgba(0, 0, 0, .3)),
-    linear-gradient(180deg, #d42a2a, #b51d1d);
-  box-shadow: 0 16px 22px -12px rgba(0, 0, 0, .5);
+    linear-gradient(90deg, transparent 43%, #f6e7c8 43% 57%, transparent 57%),
+    linear-gradient(90deg, rgba(0, 0, 0, .14), transparent 30%, rgba(255, 255, 255, .12) 50%, transparent 70%, rgba(0, 0, 0, .16)),
+    linear-gradient(180deg, #cf5679, var(--pen) 60%, var(--pen-deep));
+  box-shadow: 0 16px 22px -12px rgba(0, 0, 0, .45);
 }
-.can__body::before { /* etiqueta */
-  content: "";
+.box__lid {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 22px;
+  height: 28px;
+  border-radius: 5px;
+  background:
+    linear-gradient(90deg, transparent 43%, #f8ecd2 43% 57%, transparent 57%),
+    linear-gradient(180deg, #d9668b, #b83c62);
+  box-shadow: 0 4px 6px -2px rgba(0, 0, 0, .3);
+  transition: transform .7s var(--ease-spring);
+}
+.box__bow { /* moño */
   position: absolute;
   left: 50%;
-  top: 42%;
-  width: 54px;
-  height: 54px;
-  margin: -27px 0 0 -27px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 40%, #fff6e0, #f2deb0);
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, .25);
+  top: 4px;
+  width: 0;
+  height: 0;
+  transition: transform .7s var(--ease-spring);
 }
-.can__body::after { /* bigotes */
+.box__bow::before, .box__bow::after {
   content: "";
   position: absolute;
-  left: 50%;
-  top: 46%;
-  width: 34px;
-  height: 9px;
-  margin-left: -17px;
-  border-radius: 0 0 50% 50%;
-  background: #3a2414;
-}
-.can__lid {
-  position: absolute;
-  inset: 0 -3px auto;
+  top: 0;
+  width: 30px;
   height: 22px;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 40%, #fbfbfb, #d7d7d7 70%, #b9b9b9);
-  box-shadow: 0 2px 2px rgba(0, 0, 0, .2);
+  border: 6px solid #f6e7c8;
+  border-radius: 50% 50% 40% 40%;
 }
-.can.is-wobbling { animation: wobble .7s var(--ease-out); }
+.box__bow::before { right: -2px; transform: rotate(-24deg); }
+.box__bow::after { left: -2px; transform: rotate(24deg); }
+.box.is-wobbling { animation: wobble .7s var(--ease-out); }
 @keyframes wobble {
-  20% { transform: rotate(-9deg) translateY(-6px); }
-  45% { transform: rotate(7deg) translateY(-10px); }
+  20% { transform: rotate(-8deg) translateY(-6px); }
+  45% { transform: rotate(6deg) translateY(-10px); }
   70% { transform: rotate(-3deg); }
 }
-.can.is-lifted { animation: lift 1.2s var(--ease-out) both; }
-@keyframes lift { 40% { transform: translateY(-28px) rotate(-4deg); } 100% { transform: none; } }
-.page.is-current:not(.is-seen) .can { animation: can-in .9s .25s var(--ease-spring) both; }
+/* al acertar el número, la tapa salta y queda abierta */
+.box.is-open .box__lid { transform: translate(-14px, -34px) rotate(-18deg); }
+.box.is-open .box__bow { transform: translate(-14px, -34px) rotate(-18deg); }
+.box.is-open .box__base::after { /* luz que sale de la caja */
+  content: "";
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: -36px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 100%, rgba(255, 236, 190, .9), transparent 70%);
+  animation: fade-in .8s var(--ease-out) both;
+}
+.page.is-current:not(.is-seen) .box { animation: can-in .9s .25s var(--ease-spring) both; }
 @keyframes can-in { from { opacity: 0; transform: translateY(-40px) rotate(-12deg); } }
-.pringles__field { width: min(100%, var(--w, 220px)); }
-.pringles__ok {
+.number__field { width: min(100%, var(--w, 220px)); }
+.number__ok {
   margin: 18px 0 0;
-  font: italic 600 26px/1.25 var(--serif);
+  font: italic 600 28px/1.25 var(--serif);
   color: var(--pen);
   animation: rise-in .8s var(--ease-out) both;
 }

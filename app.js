@@ -315,10 +315,9 @@ function buildBook(gift, restoring) {
 
   const pages = [
     letterPage(gift, photos.frames[0], restoring),
+    gift.numero?.codigo ? numberPage(gift) : null,
     ticketPage(gift, photos.frames[1]),
     questionPage(gift),
-    gift.quiz?.length ? quizPage(gift) : null,
-    gift.pringles?.codigo ? pringlesPage(gift) : null,
     setlistPage(gift),
     ...middle.map((frames) => photoPage(frames)),
     finalPage(gift, n > 2 ? photos.frames[n - 1] : null),
@@ -885,69 +884,7 @@ function addToCalendar(gift) {
   link.remove();
 }
 
-/* ───────── Hoja: quiz ───────── */
-
-function quizPage(gift) {
-  const page = makePage("page--quiz", "Quiz");
-  const qs = gift.quiz;
-  const dots = qs.map(() => el("span", { class: "quiz__dot" }));
-  const stage = el("div", { class: "quiz__stage", "aria-live": "polite" });
-  page.body.append(el("div", { class: "quiz__progress", "aria-hidden": "true" }, dots), stage);
-
-  const end = () => {
-    dots.forEach((d) => { d.classList.add("is-done"); d.classList.remove("is-now"); });
-    stage.replaceChildren(el("div", { class: "quiz__end" },
-      el("strong", { text: gift.quizFinal?.titulo ?? "¡Perfecto!" }),
-      el("span", { text: gift.quizFinal?.texto ?? "Las respondiste todas." })));
-  };
-  if (state.quiz) {
-    end();
-    return page;
-  }
-
-  page.ready = false;
-  // una pregunta por vez; si se equivoca, esa opción tiembla y se tacha, y puede seguir intentando
-  const show = (n) => {
-    if (n >= qs.length) {
-      end();
-      save({ quiz: true });
-      const r = stage.getBoundingClientRect();
-      confetti.burst(r.left + r.width / 2, r.top + r.height / 2, 120);
-      vibrate([30, 40, 90]);
-      setReady(page);
-      return;
-    }
-    dots.forEach((d, i) => {
-      d.classList.toggle("is-done", i < n);
-      d.classList.toggle("is-now", i === n);
-    });
-    const q = qs[n];
-    let locked = false;
-    const opts = q.opciones.map((text, i) => {
-      const b = el("button", { class: "quiz__opt", type: "button", text });
-      b.addEventListener("click", () => {
-        if (locked || b.classList.contains("is-wrong")) return;
-        if (i === q.correcta) {
-          locked = true;
-          b.classList.add("is-right");
-          vibrate(20);
-          setTimeout(() => show(n + 1), 900);
-        } else {
-          b.classList.add("is-wrong");
-          vibrate([40, 30, 40]);
-        }
-      });
-      return b;
-    });
-    stage.replaceChildren(el("div", { class: "quiz__step" },
-      el("p", { class: "quiz__q", text: q.pregunta }),
-      el("div", { class: "quiz__opts" }, opts)));
-  };
-  show(0);
-  return page;
-}
-
-/* ───────── Hoja: la lata de Pringles ───────── */
+/* ───────── Hoja: el número escondido ───────── */
 
 // Casillas de código (una por carácter) sobre un único input real, como las del candado
 function codeField(len, numeric) {
@@ -963,7 +900,7 @@ function codeField(len, numeric) {
     class: "code__input", type: "text", inputmode: numeric ? "numeric" : "text", maxlength: len,
     autocomplete: "off", autocapitalize: "characters", autocorrect: "off", spellcheck: "false", "aria-label": "Código",
   });
-  const wrap = el("div", { class: "code__field pringles__field" }, tilesBox, input);
+  const wrap = el("div", { class: "code__field number__field" }, tilesBox, input);
   wrap.style.setProperty("--w", `${Math.min(300, len * 52)}px`);
 
   let focused = false;
@@ -996,50 +933,57 @@ function codeField(len, numeric) {
   return api;
 }
 
-function pringlesPage(gift) {
-  const page = makePage("page--pringles", "Pringles");
-  const pr = gift.pringles;
-  const code = normalizePassword(String(pr.codigo)).replace(/[^A-Z0-9]/g, "");
-  const can = el("button", { class: "can", type: "button", "aria-label": "La lata" },
-    el("span", { class: "can__body" }), el("span", { class: "can__lid" }));
-  can.addEventListener("click", () => {
-    can.classList.remove("is-wobbling", "is-lifted");
-    void can.offsetWidth;
-    can.classList.add("is-wobbling");
+// Hoja "Te falta algo": el regalo todavía no; primero hay que encontrar un número escondido
+function numberPage(gift) {
+  const page = makePage("page--number", "Te falta algo");
+  const cfg = gift.numero;
+  const code = normalizePassword(String(cfg.codigo)).replace(/[^A-Z0-9]/g, "");
+  // caja de regalo cerrada: se sacude al tocarla y se abre al acertar
+  const box = el("button", { class: "box", type: "button", "aria-label": "El regalo, cerrado" },
+    el("span", { class: "box__base" }), el("span", { class: "box__lid" }), el("span", { class: "box__bow" }));
+  box.addEventListener("click", () => {
+    if (box.classList.contains("is-open")) return;
+    box.classList.remove("is-wobbling");
+    void box.offsetWidth;
+    box.classList.add("is-wobbling");
     vibrate(15);
   });
   const field = codeField(code.length, /^\d+$/.test(code));
   const msg = el("p", { class: "code__msg", role: "status", "aria-live": "polite" });
-  const hint = el("p", { class: "lock__hint", text: pr.pista, hidden: true });
+  const hint = el("p", { class: "lock__hint", text: cfg.pista, hidden: true });
   const hintBtn = el("button", { class: "hint-btn", type: "button", text: "¿Pista?" });
   hintBtn.addEventListener("click", () => { hint.hidden = !hint.hidden; });
-  page.body.append(el("p", { class: "pringles__text", text: pr.texto }), can, field.el, msg, pr.pista ? hintBtn : null, hint);
+  page.body.append(
+    el("h2", { class: "number__title", text: cfg.titulo }),
+    el("p", { class: "number__text", text: cfg.texto }),
+    box, field.el, msg, cfg.pista ? hintBtn : null, hint);
 
   const solved = () => {
     field.set(code);
     field.input.disabled = true;
     field.tilesBox.classList.add("is-ok");
+    box.classList.add("is-open");
+    box.setAttribute("aria-label", "El regalo, abierto");
     msg.remove();
     hintBtn.remove();
     hint.remove();
-    page.body.append(el("p", { class: "pringles__ok", text: pr.ok }));
+    page.body.append(el("p", { class: "number__ok", text: cfg.ok }));
   };
-  if (state.pringles) {
+  if (state.numero) {
     solved();
     return page;
   }
 
   page.ready = false;
-  const NOPE = ["Ese no es. Buscá bien.", "Tampoco. Mirá todos los lados de la lata.", "Casi… seguí buscando."];
+  const NOPE = ["Ese no es. Buscá bien.", "Tampoco. Seguí buscando.", "Casi… mirá con más atención."];
   let tries = 0;
   field.onComplete = (v) => {
     if (v === code) {
       field.input.blur();
-      save({ pringles: true });
+      save({ numero: true });
       solved();
-      can.classList.add("is-lifted");
-      const r = can.getBoundingClientRect();
-      confetti.burst(r.left + r.width / 2, r.top, 130);
+      const r = box.getBoundingClientRect();
+      confetti.burst(r.left + r.width / 2, r.top, 140);
       vibrate([30, 40, 90]);
       setReady(page);
       return;
