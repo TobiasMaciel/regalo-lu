@@ -34,7 +34,7 @@
       <h1 class="lock__title" id="lock-title">Para Lu</h1>
       <p class="lock__hint">Escondí una palabra en la carta.<br>Las letras que brillan te van a guiar.</p>
 
-      <form class="code" id="code-form" novalidate>
+      <form class="code" id="code-form" novalidate onsubmit="event.preventDefault()">
         <label class="sr-only" for="code-input">Palabra secreta</label>
         <div class="code__field">
           <div class="code__tiles" id="code-tiles" aria-hidden="true"></div>
@@ -45,6 +45,12 @@
         <button class="btn btn--ink" id="code-submit" type="submit">Abrir la carta</button>
         <p class="code__msg" id="code-msg" role="status" aria-live="polite"></p>
       </form>
+      <script>
+        // Abierta con doble clic (file://) los módulos no cargan: avisar en vez de no hacer nada
+        if (location.protocol === "file:") {
+          document.getElementById("code-msg").textContent = "Abrila desde el link (o con un servidor local), no con doble clic 🙂";
+        }
+      </script>
     </section>
 
     <!-- 2. La carta -->
