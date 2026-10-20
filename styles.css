@@ -70,12 +70,12 @@ body::after {
   text-align: center;
 }
 
-/* El cuaderno tiene un tamaño fijo de diseño (382×680) y se escala para entrar en cualquier pantalla.
+/* El cuaderno tiene un tamaño fijo de diseño (420×620) y se escala para entrar en cualquier pantalla.
    .fit ocupa el tamaño ya escalado; --fit lo calcula app.js. */
 .fit {
   position: relative;
-  width: calc(10px + 382px * var(--fit, 1));
-  height: calc(680px * var(--fit, 1));
+  width: calc(10px + 420px * var(--fit, 1));
+  height: calc(620px * var(--fit, 1));
 }
 .is-loading .book { visibility: hidden; animation: none; }
 
@@ -116,14 +116,14 @@ body::after {
   top: 0;
   left: 10px; /* lugar para la espiral */
   display: grid;
-  grid-template-rows: 680px;
-  width: 382px;
-  height: 680px;
+  grid-template-rows: 620px;
+  width: 420px;
+  height: 620px;
   touch-action: none; /* el dedo arrastra la hoja; el navegador no se lo roba para scrollear */
   /* escala a la pantalla + leve inclinación con el mouse (--tx/--ty desde JS) */
   transform-origin: 0 0;
-  transform: scale(var(--fit, 1)) translate(191px, 340px) perspective(1400px)
-             rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg)) translate(-191px, -340px);
+  transform: scale(var(--fit, 1)) translate(210px, 310px) perspective(1400px)
+             rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg)) translate(-210px, -310px);
   transition: transform .6s var(--ease-out);
   /* entra deslizándose al abrir la página */
   animation: book-in 1s var(--ease-out) both;
@@ -175,7 +175,7 @@ body::after {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: 680px;
+  height: 620px;
   overflow: hidden; /* nada de una hoja asoma por debajo de la de arriba */
   isolation: isolate; /* cada hoja es su propia capa: lo de una hoja de abajo nunca tapa a la de arriba */
   user-select: none; /* arrastrar la hoja no selecciona texto */
@@ -797,7 +797,7 @@ body::after {
 .collage {
   position: relative;
   flex: 1;
-  min-height: 460px;
+  min-height: 420px;
 }
 .collage .polaroid {
   position: absolute;
@@ -1069,15 +1069,17 @@ body::after {
 }
 .detail__heart span {
   display: block;
-  font-size: 17px;
+  font-size: 21px;
   line-height: 34px;
-  color: #ee7fb4;
-  opacity: .85;
+  color: #d9407a;
+  opacity: 1;
   transform: rotate(-14deg);
-  text-shadow: 0 0 1px rgba(160, 40, 90, .35);
+  text-shadow: 0 0 1px #fff, 0 0 2px #fff, 0 0 6px rgba(255, 255, 255, .8);
+  animation: twinkle 4s 1.5s ease-in-out infinite;
   transition: transform .6s var(--ease-spring), opacity .4s, color .4s;
 }
 .detail__heart.is-hinting span { animation: heart-hint 1.6s ease-in-out infinite; }
+@keyframes twinkle { 0%, 82%, 100% { transform: rotate(-14deg) scale(1); } 90% { transform: rotate(-14deg) scale(1.35); filter: brightness(1.25); } }
 @keyframes heart-hint { 50% { transform: rotate(-14deg) scale(1.6); opacity: 1; } }
 .detail__heart.is-found span {
   animation: none;
@@ -1108,7 +1110,7 @@ body::after {
 
 /* ───────── Más vida: tapa, canto de hojas, luz, fotos repartidas y dibujitos ───────── */
 
-/* tapa de tela rosa que asoma detrás de las hojas */
+/* tapa de cuero marrón que asoma detrás de las hojas */
 .book::before {
   content: "";
   position: absolute;
@@ -1116,15 +1118,15 @@ body::after {
   inset: -9px -13px -13px -5px;
   border-radius: 9px 24px 24px 9px;
   background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, .06) 0 1.5px, transparent 1.5px 4px),
-    repeating-linear-gradient(-45deg, rgba(80, 20, 40, .07) 0 1.5px, transparent 1.5px 4px),
+    var(--grain),
+    radial-gradient(140% 100% at 50% 50%, transparent 60%, rgba(40, 22, 10, .35)),
     radial-gradient(120% 80% at 80% 0%, rgba(255, 255, 255, .22), transparent 60%),
-    linear-gradient(160deg, #dc8faa, #c4698a 55%, #a9506f);
+    linear-gradient(160deg, #a7805c, #8b6342 55%, #6e4b30);
   box-shadow:
-    0 42px 60px -28px rgba(70, 25, 40, .55),
-    0 12px 22px -10px rgba(70, 25, 40, .35),
-    inset 0 0 0 1px rgba(255, 255, 255, .14),
-    inset 0 -3px 6px rgba(60, 10, 30, .25);
+    0 42px 60px -28px rgba(50, 30, 15, .55),
+    0 12px 22px -10px rgba(50, 30, 15, .35),
+    inset 0 0 0 1px rgba(255, 235, 210, .16),
+    inset 0 -3px 6px rgba(30, 15, 5, .3);
 }
 
 /* papel con luz: sombra cerca de la espiral y un brillo arriba a la derecha */
@@ -1173,7 +1175,7 @@ body::after {
 .stuck { position: absolute; z-index: 2; }
 .stuck .polaroid { width: 100%; }
 .stuck--letter { right: 20px; bottom: 82px; width: 44%; max-width: 172px; }
-.stuck--letter-b { left: 56px; bottom: 150px; width: 34%; max-width: 132px; }
+.stuck--letter-b { left: 56px; bottom: 112px; width: 32%; max-width: 128px; }
 .stuck-row { position: relative; width: 100%; height: 230px; margin-top: 30px; }
 .stuck--gift { left: 4%; top: 0; width: 48%; }
 .stuck--gift-b { right: 2%; top: 30px; width: 42%; }
@@ -1240,6 +1242,66 @@ body::after {
   clip-path: inset(0); /* que el desenfoque no se salga del marco */
 }
 @keyframes tease-in { from { opacity: 0; transform: translateY(-20px) rotate(calc(var(--tilt) * 3)); } }
+
+/* ───────── Candado: subtítulo sutil ───────── */
+.lock__title { margin-bottom: 6px; }
+.lock__sub {
+  margin: 0 0 30px;
+  font: italic 300 18px/1.3 var(--serif);
+  color: var(--ink-faint);
+}
+
+/* ───────── ¿Qué creés que es? ───────── */
+.page--guess .page__body { justify-content: center; text-align: center; }
+.guess__opts { display: grid; gap: 10px; margin-top: 24px; }
+.guess__opt {
+  appearance: none;
+  width: 100%;
+  padding: 13px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .5);
+  box-shadow: inset 0 0 0 1.5px rgba(36, 35, 34, .16), 0 6px 14px -12px rgba(0, 0, 0, .5);
+  font: 400 18px/1.25 var(--serif);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background .25s, box-shadow .25s, transform .2s, opacity .3s;
+}
+.guess__opt:active { transform: scale(.98); }
+.page.is-current:not(.is-seen) .guess__opt { animation: rise-in .6s calc(var(--n, 0) * 90ms + 300ms) var(--ease-out) both; }
+.guess__opt:nth-child(1) { --n: 0; }
+.guess__opt:nth-child(2) { --n: 1; }
+.guess__opt:nth-child(3) { --n: 2; }
+.guess__opt:nth-child(4) { --n: 3; }
+.guess__opt:nth-child(5) { --n: 4; }
+.guess__opt.is-wrong { opacity: .45; text-decoration: line-through; animation: shake .45s; }
+.guess__opt.is-right { background: var(--pen); color: #fff6f8; box-shadow: none; opacity: 1; animation: pop .45s var(--ease-spring); }
+@keyframes pop { 50% { transform: scale(1.05); } }
+.guess__reply {
+  min-height: 1.4em;
+  margin: 18px 0 0;
+  font: italic 400 21px/1.3 var(--serif);
+  color: var(--ink-soft);
+}
+.guess__reply.is-shown { animation: rise-in .5s var(--ease-out); }
+.guess__reply.is-right { color: var(--pen); font-weight: 500; animation: rise-in .5s var(--ease-out); }
+.doodle--guess { left: 58px; top: 70px; width: 28px; height: 28px; transform: rotate(-14deg); }
+.doodle--guess-b { right: 46px; top: 110px; width: 24px; height: 24px; }
+
+/* ───────── La nota antes de raspar ───────── */
+.page--note { cursor: pointer; }
+.page--note .paper__ruled { padding-top: 40px; }
+.note__sign {
+  margin: 0 0 18px;
+  text-align: right;
+  font: italic 500 26px/1.2 var(--serif);
+  color: var(--pen);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity .8s, transform .8s var(--ease-out);
+}
+.page--note.is-signed .note__sign { opacity: 1; transform: none; }
+.doodle--note { right: 40px; bottom: 120px; width: 40px; height: 40px; transform: rotate(10deg); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

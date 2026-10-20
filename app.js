@@ -144,8 +144,8 @@ let fitScale = 1;
 const typing = () => document.activeElement?.matches?.("input") ?? false;
 function fitBook() {
   if (typing()) return keepFieldVisible(); // el teclado no achica el cuaderno
-  const W = 392;
-  const H = 680;
+  const W = 430;
+  const H = 620;
   fitScale = Math.min((innerWidth - 20) / W, (innerHeight - 28) / H, 1.25);
   $("#fit").style.setProperty("--fit", fitScale.toFixed(4));
 }
@@ -361,6 +361,8 @@ function buildBook(gift, restoring) {
     letterPage(gift, letterFrames, restoring),
     gift.numero?.codigo ? numberPage(gift, numberFrames) : null,
     gift.detalle ? detailPage(gift, photos) : null,
+    gift.adivinanza ? guessPage(gift) : null,
+    gift.nota ? notePage(gift) : null,
     ticketPage(gift, ticketFrames),
     questionPage(gift, questionFrames),
     setlistPage(gift, setlistFrames),
@@ -1156,6 +1158,94 @@ function detailPage(gift, photos) {
   return page;
 }
 
+/* ───────── Hoja: ¿qué creés que es? ───────── */
+
+// Adivinanza en joda antes del regalo: cada opción boluda tiene su respuesta; la buena habilita seguir
+function guessPage(gift) {
+  const page = makePage("page--guess", "¿Qué es?");
+  const cfg = gift.adivinanza;
+  const reply = el("p", { class: "guess__reply", "aria-live": "polite" });
+  const buttons = cfg.opciones.map((o) => el("button", { class: "guess__opt", type: "button", text: o.texto }));
+  page.body.append(
+    el("h2", { class: "number__title", text: cfg.titulo }),
+    el("p", { class: "number__text", text: cfg.pregunta }),
+    el("div", { class: "guess__opts" }, buttons),
+    reply);
+  page.el.append(doodle("star", "doodle--guess"), doodle("sparkle", "doodle--guess-b"));
+
+  const right = cfg.opciones.findIndex((o) => o.correcta);
+  const solve = (animate) => {
+    buttons.forEach((b, i) => {
+      b.disabled = true;
+      if (i === right) b.classList.add("is-right");
+    });
+    reply.textContent = cfg.opciones[right]?.respuesta ?? "";
+    reply.classList.toggle("is-right", true);
+    if (!animate) return;
+    const r = buttons[right].getBoundingClientRect();
+    confetti.burst(r.left + r.width / 2, r.top, 90);
+    vibrate([30, 40, 60]);
+  };
+  if (state.adivinanza) {
+    solve(false);
+    return page;
+  }
+
+  page.ready = false;
+  buttons.forEach((b, i) => b.addEventListener("click", () => {
+    if (b.disabled) return;
+    if (i === right) {
+      save({ adivinanza: true });
+      solve(true);
+      setReady(page);
+      return;
+    }
+    // respuesta en joda: la opción tiembla, se tacha y aparece el comentario
+    b.classList.add("is-wrong");
+    b.disabled = true;
+    reply.classList.remove("is-shown", "is-right");
+    void reply.offsetWidth;
+    reply.textContent = cfg.opciones[i].respuesta;
+    reply.classList.add("is-shown");
+    vibrate([40, 30, 40]);
+  }));
+  return page;
+}
+
+/* ───────── Hoja: la nota antes de raspar ───────── */
+
+// "Bueno, ahora sí…": se escribe sola sobre los renglones, como la carta
+function notePage(gift) {
+  const page = makePage("page--note", "Ahora sí");
+  const cfg = gift.nota;
+  const lines = el("div", { class: "paper__lines", "aria-live": "polite" });
+  page.body.append(
+    el("div", { class: "paper__ruled ruled" }, lines),
+    el("p", { class: "note__sign", text: cfg.firma }));
+  page.el.append(doodle("heart", "doodle--note"));
+
+  if (state.nota) {
+    cfg.lineas.forEach((t) => writeLine(lines, t, true));
+    page.el.classList.add("is-signed");
+    return page;
+  }
+  page.ready = false;
+  let played = false;
+  page.onEnter = async () => {
+    if (played) return;
+    played = true;
+    for (const text of cfg.lineas) {
+      const { p, duration } = writeLine(lines, text, false);
+      await Promise.race([sleep(duration + 450), tapOn(page.el)]);
+      p.classList.add("is-instant");
+    }
+    page.el.classList.add("is-signed");
+    save({ nota: true });
+    setReady(page);
+  };
+  return page;
+}
+
 /* ───────── Hojas: canciones, fotos y cierre ───────── */
 
 function setlistPage(gift, frames = []) {
@@ -1177,8 +1267,8 @@ function setlistPage(gift, frames = []) {
 const COLLAGE = {
   1: [[16, 14, 70, -3]],
   2: [[2, 2, 62, -5], [34, 46, 62, 5]],
-  3: [[2, 1, 58, -6], [40, 30, 56, 6], [6, 62, 56, 3]],
-  4: [[0, 2, 56, -6], [44, 6, 54, 5], [4, 56, 54, 4], [46, 59, 52, -5]],
+  3: [[2, 1, 54, -6], [42, 28, 52, 6], [6, 58, 52, 3]],
+  4: [[2, 1, 50, -6], [48, 4, 48, 5], [5, 53, 48, 4], [49, 56, 46, -5]],
 };
 
 function photoPage(frames) {
