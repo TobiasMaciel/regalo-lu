@@ -82,21 +82,26 @@ async function decryptPhotos(keyB64) {
   }));
 }
 
-/* ───────── Navegación entre pantallas ───────── */
+/* ───────── Hojas del cuaderno ───────── */
 
-async function go(fromId, toId) {
-  const from = $(`#${fromId}`);
-  const to = $(`#${toId}`);
-  if (from && !from.hidden) {
-    from.classList.add("is-leaving");
-    await sleep(430);
-    from.hidden = true;
-    from.classList.remove("is-leaving");
-  }
-  window.scrollTo(0, 0);
-  to.hidden = false;
-  to.classList.add("is-entering");
-  setTimeout(() => to.classList.remove("is-entering"), 950);
+// La hoja gira sobre la espiral y deja ver la que ya estaba abajo
+async function turnPage(page) {
+  page.classList.add("is-turning", "is-turned");
+  await sleep(1150);
+  page.classList.remove("is-turning");
+  page.hidden = true;
+}
+
+async function openBook(gift, key) {
+  const state = { key, revealed: false, answered: false };
+  const giftPage = prepareGift(gift, state); // la entrada ya queda pegada y tapada en la hoja 3
+  $("#paper-date").textContent = new Intl.DateTimeFormat("es-AR", { timeZone: TZ, day: "numeric", month: "long", year: "numeric" }).format(new Date());
+  $("#paper-greeting").textContent = `${gift.nombre}:`;
+  await sleep(350);
+  await turnPage($("#page-lock"));
+  await playLetter(gift);
+  await turnPage($("#page-letter"));
+  giftPage.start();
 }
 
 /* ───────── 1. Candado ───────── */
@@ -120,6 +125,13 @@ function initLock() {
   let focused = false;
   let busy = false;
   let attempts = 0;
+
+  const hintBtn = $("#hint-btn");
+  const hint = $("#lock-hint");
+  hintBtn.addEventListener("click", () => {
+    hint.hidden = !hint.hidden;
+    hintBtn.setAttribute("aria-expanded", String(!hint.hidden));
+  });
 
   // Un único input real: cada letra queda sí o sí en su propia casilla.
   const clean = (v) => normalizePassword(v).replace(/[^A-Z]/g, "").slice(0, LEN);
@@ -168,28 +180,29 @@ function initLock() {
     busy = true;
     form.classList.add("is-busy");
     submit.textContent = "Abriendo…";
+    let unlocked;
     try {
-      const { gift, key } = await decryptGift(v);
-      tilesBox.classList.add("is-ok");
-      input.blur();
-      vibrate(30);
-      store.set({ gift, key, revealed: false, answered: false });
-      loadPhotosScript().catch(() => {}); // precarga mientras lee la carta
-      await sleep(350);
-      $("#lock-page").classList.add("is-turning"); // se da vuelta la hoja del cuaderno
-      await sleep(1000);
-      await playLetter(gift, key);
+      unlocked = await decryptGift(v);
     } catch (err) {
       if (err instanceof NetworkError) {
         fail("No se pudo cargar. Probá de nuevo en un rato.", false);
       } else {
         fail(NOPE[attempts++ % NOPE.length], true);
       }
-      submit.textContent = "Abrir la carta";
-    } finally {
+      submit.textContent = "Abrir";
       busy = false;
       form.classList.remove("is-busy");
+      return;
     }
+
+    const { gift, key } = unlocked;
+    tilesBox.classList.add("is-ok");
+    msg.textContent = "";
+    input.blur();
+    vibrate(30);
+    store.set({ gift, key, revealed: false, answered: false });
+    loadPhotosScript().catch(() => {}); // precarga mientras lee la carta
+    await openBook(gift, key);
   });
 
   function fail(text, clear) {
@@ -241,14 +254,12 @@ const tapOn = (...targets) => new Promise((resolve) => {
   targets.forEach((t) => t.addEventListener("click", done));
 });
 
-async function playLetter(gift, key) {
-  await go("lock", "letter");
-  const paper = $("#paper");
+async function playLetter(gift) {
+  const paper = $("#page-letter");
   const lines = $("#intro-lines");
   const next = $("#intro-next");
-  $("#paper-date").textContent = new Intl.DateTimeFormat("es-AR", { timeZone: TZ, day: "numeric", month: "long", year: "numeric" }).format(new Date());
-  $("#paper-greeting").textContent = `${gift.nombre}:`;
   lines.textContent = "";
+  next.hidden = false;
 
   for (let i = 0; i < gift.intro.length; i++) {
     const last = i === gift.intro.length - 1;
@@ -258,15 +269,13 @@ async function playLetter(gift, key) {
     // tocar la carta mientras escribe completa la línea al instante
     await Promise.race([sleep(duration), tapOn(paper)]);
     p.classList.add("is-instant");
-    next.textContent = last ? "Abrir mi regalo" : "Seguir";
+    next.textContent = last ? "Dar vuelta la hoja" : "Seguir";
     next.disabled = false;
     next.classList.add("is-ready");
     await tapOn(paper, next);
   }
 
-  next.disabled = true;
-  await go("letter", "gift");
-  showGift(gift, { key, revealed: false, answered: false });
+  next.hidden = true;
 }
 
 /* ───────── 3. Ticket ───────── */
@@ -274,43 +283,47 @@ async function playLetter(gift, key) {
 const fmt = (iso, opts) => new Intl.DateTimeFormat("es-AR", { timeZone: TZ, hour12: false, ...opts }).format(new Date(iso));
 const hour = (iso) => fmt(iso, { hour: "2-digit", minute: "2-digit" });
 
+// código de barras vertical para el talón
 function barcode(seed) {
   let h = 2166136261;
   for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
   const rand = () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909)) >>> 0) / 4294967296;
-  let x = 0;
+  let y = 0;
   let bars = "";
-  while (x < 196) {
-    const w = 1 + Math.floor(rand() * 3.2);
-    bars += `<rect x="${x}" width="${w}" height="54"/>`;
-    x += w + 1 + Math.floor(rand() * 2.5);
+  while (y < 62) {
+    const t = .6 + Math.floor(rand() * 3) * .6;
+    bars += `<rect y="${y.toFixed(1)}" width="34" height="${t.toFixed(1)}"/>`;
+    y += t + .6 + Math.floor(rand() * 2) * .6;
   }
-  return `<svg class="ticket__barcode" viewBox="0 0 200 54" preserveAspectRatio="none" fill="#2a2421" aria-hidden="true">${bars}</svg>`;
+  return `<svg class="ticket__barcode" viewBox="0 0 34 64" preserveAspectRatio="none" fill="#1d1c1b" aria-hidden="true">${bars}</svg>`;
 }
 
 function buildTicket(gift) {
   const s = gift.show;
-  const day = fmt(s.inicio, { day: "2-digit", month: "2-digit" }).replace("/", "");
-  const item = (label, value, cls) => el("div", { class: cls }, el("dt", { text: label }), el("dd", {}, ...[].concat(value)));
+  const date = fmt(s.inicio, { weekday: "short", day: "2-digit", month: "short" }).replace(/[.,]/g, "");
+  const number = `Nº ${fmt(s.inicio, { day: "2-digit", month: "2-digit" }).replace("/", "")}${String(s.cantidad).padStart(2, "0")}`;
+  const row = (label, ...value) => [el("dt", { text: label }), el("dd", {}, ...value)];
 
   return [
-    el("header", { class: "ticket__head" },
-      el("div", { class: "ticket__kicker" },
-        el("span", { text: `Admite ${s.cantidad}` }),
-        el("span", { text: fmt(s.inicio, { year: "numeric" }) })),
+    el("div", { class: "ticket__main" },
+      el("div", { class: "ticket__top" },
+        el("span", { text: "Entrada" }),
+        el("span", { text: `Gira ${fmt(s.inicio, { year: "numeric" })}` })),
       el("h2", { class: "ticket__artist", text: s.artista }),
-      el("p", { class: "ticket__tour", text: `Gira «${s.gira}»` })),
-    el("dl", { class: "ticket__grid" },
-      item("Fecha", s.fechaTexto, "span-2"),
-      item("Puertas", hour(s.puertas)),
-      item("Show", el("span", { class: "big", text: hour(s.inicio) })),
-      item("Lugar", [s.lugar, el("small", { text: s.direccion })], "span-2"),
-      item("Sector", s.sector),
-      item("Titulares", s.titulares.join(" & "))),
-    el("footer", { class: "ticket__stub", html: barcode(s.artista + s.inicio) },
-      el("div", { class: "ticket__code" },
-        el("span", { class: "ticket__admit", text: `×${s.cantidad}` }),
-        `Nº ${day}-${String(s.cantidad).padStart(2, "0")}`)),
+      el("p", { class: "ticket__tour", text: s.gira }),
+      el("div", { class: "ticket__when" },
+        el("span", { text: date }),
+        el("span", { text: `${hour(s.inicio)} hs` })),
+      el("dl", { class: "ticket__rows" },
+        row("Lugar", s.lugar, el("br"), s.direccion),
+        row("Puertas", `${hour(s.puertas)} hs`),
+        row("Sector", s.sector),
+        row("Titular", s.titulares.join(" & ")))),
+    el("div", { class: "ticket__stub" },
+      el("span", { class: "ticket__admit", text: "Admite" }),
+      el("span", { class: "ticket__qty", text: String(s.cantidad) }),
+      el("span", { class: "ticket__code", text: number }),
+      el("span", { html: barcode(s.artista + s.inicio) })),
   ];
 }
 
@@ -319,7 +332,9 @@ function buildTicket(gift) {
 async function setupScratch(canvas, onDone) {
   try { await Promise.race([document.fonts.ready, sleep(1200)]); } catch {}
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const { width: w, height: h } = canvas.getBoundingClientRect();
+  // offsetWidth/Height: tamaño real sin la rotación de la entrada pegada
+  const w = canvas.offsetWidth;
+  const h = canvas.offsetHeight;
   canvas.width = Math.round(w * dpr);
   canvas.height = Math.round(h * dpr);
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -348,28 +363,26 @@ async function setupScratch(canvas, onDone) {
   }
   ctx.textAlign = "center";
   ctx.fillStyle = "rgba(74, 50, 14, .82)";
-  ctx.font = `400 ${Math.round(Math.min(w / 6.5, 58))}px "Shadows Into Light", "Segoe Print", cursive`;
-  ctx.fillText("Rascá acá", w / 2, h / 2 - 8);
-  ctx.font = `500 12px "IBM Plex Mono", ui-monospace, monospace`;
+  ctx.font = `italic 600 ${Math.round(Math.min(w / 7, 46))}px "Cormorant Garamond", Garamond, Georgia, serif`;
+  ctx.fillText("Rascá acá", w / 2, h / 2 + 4);
+  ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`;
   ctx.fillStyle = "rgba(74, 50, 14, .6)";
-  ctx.fillText("C O N   E L   D E D O", w / 2, h / 2 + 24);
-  ctx.font = `400 22px Fraunces, Georgia, serif`;
-  ctx.fillText("✦", w / 2, h / 2 - 66);
+  ctx.fillText("C O N   E L   D E D O", w / 2, h / 2 + 30);
+  ctx.font = `400 18px Georgia, serif`;
+  ctx.fillText("✦", w / 2, h / 2 - 34);
 
   ctx.globalCompositeOperation = "destination-out";
   ctx.strokeStyle = "#000"; // opaco: borra la lámina del todo
   ctx.fillStyle = "#000";
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  ctx.lineWidth = Math.max(38, w / 9);
+  ctx.lineWidth = Math.max(30, w / 10);
 
   let last = null;
   let moves = 0;
   let finished = false;
-  const point = (e) => {
-    const r = canvas.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
-  };
+  // offsetX/Y ya vienen en coordenadas locales (descuentan la rotación)
+  const point = (e) => ({ x: e.offsetX, y: e.offsetY });
   const cleared = () => {
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     let clear = 0;
@@ -497,24 +510,25 @@ const confetti = (() => {
 
 /* ───────── Regalo: ticket → pregunta → después del sí ───────── */
 
-function showGift(gift, state) {
+// Pega la entrada en la hoja 3 y la tapa con la lámina; start() se llama cuando la hoja queda a la vista
+function prepareGift(gift, state) {
   const ticket = $("#ticket");
-  const shadow = $("#ticket-shadow");
+  const wrap = $("#ticket-wrap");
   const canvas = $("#scratch");
   const skip = $("#scratch-skip");
-  const eyebrow = $("#gift-eyebrow");
+  const note = $("#gift-note");
   ticket.replaceChildren(...buildTicket(gift));
+  $("#glued").hidden = false;
 
   const save = (patch) => { Object.assign(state, patch); store.set({ gift, ...state }); };
 
   const onRevealed = (instant) => {
     skip.hidden = true;
-    eyebrow.textContent = "Tu regalo";
-    enableTilt(shadow);
+    note.hidden = true;
     if (!instant) {
       ticket.classList.add("is-shining");
-      const r = shadow.getBoundingClientRect();
-      confetti.burst(r.left + r.width / 2, r.top + r.height * .35, 150);
+      const r = wrap.getBoundingClientRect();
+      confetti.burst(r.left + r.width / 2, r.top + r.height / 2, 150);
       setTimeout(() => confetti.rain(90), 350);
       vibrate([40, 30, 90]);
     }
@@ -524,36 +538,23 @@ function showGift(gift, state) {
 
   if (state.revealed) {
     canvas.remove();
+    wrap.classList.remove("is-covered");
     onRevealed(true);
-    return;
+    return { start() {} };
   }
 
-  eyebrow.textContent = "Algo para vos";
-  const wrap = ticket.parentElement;
-  wrap.classList.add("is-covered");
-  requestAnimationFrame(async () => {
-    const finish = await setupScratch(canvas, () => onRevealed(false));
+  let finish = null;
+  setupScratch(canvas, () => onRevealed(false)).then((f) => {
+    finish = f;
     wrap.classList.remove("is-covered");
-    setTimeout(() => {
-      if (!state.revealed) skip.hidden = false;
-    }, 9000);
-    skip.addEventListener("click", finish, { once: true });
   });
-}
-
-function enableTilt(target) {
-  if (reduceMotion || !matchMedia("(hover: hover)").matches) return;
-  target.addEventListener("pointermove", (e) => {
-    const r = target.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width - .5;
-    const y = (e.clientY - r.top) / r.height - .5;
-    target.style.setProperty("--ry", `${x * 10}deg`);
-    target.style.setProperty("--rx", `${-y * 8}deg`);
-  });
-  target.addEventListener("pointerleave", () => {
-    target.style.setProperty("--ry", "0deg");
-    target.style.setProperty("--rx", "0deg");
-  });
+  return {
+    start() {
+      note.hidden = false;
+      setTimeout(() => { if (!state.revealed) skip.hidden = false; }, 9000);
+      skip.addEventListener("click", () => finish?.(), { once: true });
+    },
+  };
 }
 
 function showQuestion(gift, state, save, instant) {
@@ -589,14 +590,19 @@ function showQuestion(gift, state, save, instant) {
     }
     const box = actions.getBoundingClientRect();
     const b = no.getBoundingClientRect();
+    const s = yes.getBoundingClientRect();
     const maxX = box.width - b.width;
     const maxY = box.height - b.height;
+    // nunca encima del "Sí" y siempre lejos de donde estaba
+    const overYes = (x, y) => x < s.right - box.left + 8 && x + b.width > s.left - box.left - 8 &&
+                              y < s.bottom - box.top + 8 && y + b.height > s.top - box.top - 8;
     let x;
     let y;
+    let tries = 0;
     do {
       x = Math.random() * maxX;
       y = Math.random() * maxY;
-    } while (Math.hypot(x - (b.left - box.left), y - (b.top - box.top)) < 70);
+    } while (++tries < 200 && (overYes(x, y) || Math.hypot(x - (b.left - box.left), y - (b.top - box.top)) < 70));
     no.classList.add("is-running");
     no.style.left = `${x}px`;
     no.style.top = `${y}px`;
@@ -797,9 +803,9 @@ function addToCalendar(gift) {
 
 const saved = store.get();
 if (saved?.gift) {
-  $("#lock").hidden = true;
-  $("#gift").hidden = false;
-  showGift(saved.gift, { key: saved.key, revealed: Boolean(saved.revealed), answered: Boolean(saved.answered) });
+  $("#page-lock").hidden = true;
+  $("#page-letter").hidden = true;
+  prepareGift(saved.gift, { key: saved.key, revealed: Boolean(saved.revealed), answered: Boolean(saved.answered) }).start();
 } else {
   initLock();
 }

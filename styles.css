@@ -6,20 +6,15 @@
   --rule: rgba(60, 70, 90, .16);
   --ink: #242322;
   --ink-soft: #5e5952;
-  --ink-faint: #9a9286;
+  --ink-faint: #8f877b;
   --pen: #a11d1d;           /* la birome roja de la carta */
   --pen-deep: #761313;
   --on-desk: #ece4d4;
   --on-desk-soft: rgba(236, 228, 212, .62);
   --pen-on-desk: #e2675d;
-  --gold: #b98d3e;
-  --gold-light: #e6cd92;
-  --night: #1f2543;
-  --cream: #f3e7cf;
+  --card: #f6f1e6;
 
-  --serif: "Fraunces", Georgia, "Times New Roman", serif;
-  --cursive: "La Belle Aurore", "Segoe Script", "Bradley Hand", cursive;
-  --print: "Shadows Into Light", "Segoe Print", "Bradley Hand", cursive;
+  --serif: "Cormorant Garamond", "Cormorant", Garamond, Georgia, "Times New Roman", serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .22 0 0 0 .45 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -35,8 +30,8 @@ body {
   background: var(--desk);
   color: var(--on-desk);
   font-family: var(--serif);
-  font-size: 17px;
-  line-height: 1.5;
+  font-size: 19px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
@@ -67,68 +62,26 @@ body::after {
 
 :focus-visible { outline: 2px solid var(--pen-on-desk); outline-offset: 3px; }
 
-/* ───────── Pantallas ───────── */
-.screen {
+.stage {
   position: relative;
   z-index: 1;
   min-height: 100svh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: calc(28px + env(safe-area-inset-top, 0px)) 20px calc(36px + env(safe-area-inset-bottom, 0px));
+  padding: calc(28px + env(safe-area-inset-top, 0px)) 20px calc(40px + env(safe-area-inset-bottom, 0px));
   text-align: center;
 }
-.screen.is-entering { animation: screen-in .9s var(--ease-out) both; }
-.screen.is-leaving { animation: screen-out .45s ease-in both; }
-@keyframes screen-in { from { opacity: 0; transform: translateY(18px); } }
-@keyframes screen-out { to { opacity: 0; transform: translateY(-12px) scale(.98); } }
-
-/* ───────── Hoja de cuaderno con espiral ───────── */
-.notebook {
-  position: relative;
-  width: min(100%, 440px);
-  padding: 34px 24px 34px 52px;
-  border-radius: 5px 20px 20px 5px;
-  background: var(--grain), var(--page);
-  color: var(--ink);
-  text-align: left;
-  box-shadow: 0 34px 60px -24px rgba(0, 0, 0, .85), 0 2px 6px rgba(0, 0, 0, .35);
-}
-.notebook::before { /* agujeros */
-  content: "";
-  position: absolute;
-  top: 16px;
-  bottom: 16px;
-  left: 12px;
-  width: 12px;
-  background: radial-gradient(circle at 6px 11px, #1b1a19 3.6px, rgba(0, 0, 0, .25) 4.4px, transparent 5px) 0 0 / 12px 22px repeat-y;
-}
-.notebook::after { /* espiral */
-  content: "";
-  position: absolute;
-  top: 16px;
-  bottom: 16px;
-  left: -13px;
-  width: 38px;
-  background:
-    radial-gradient(ellipse 17px 4.6px at 19px 11px, transparent 58%, #0d0d0d 62%, #5b5b5b 74%, #0d0d0d 88%, transparent 92%) 0 0 / 38px 22px repeat-y;
-  filter: drop-shadow(1px 2px 1px rgba(0, 0, 0, .5));
-}
-.notebook--lined {
-  background:
-    repeating-linear-gradient(to bottom, transparent 0 39px, var(--rule) 39px 40px) 0 98px / 100% calc(100% - 118px) no-repeat,
-    var(--grain), var(--page);
-}
+.stage.is-centered { justify-content: center; }
 
 /* ───────── Botones ───────── */
 .btn {
   appearance: none;
   border: 0;
   border-radius: 999px;
-  padding: 15px 30px;
-  font: 600 17px/1 var(--serif);
-  letter-spacing: .01em;
+  padding: 14px 30px;
+  font: 600 19px/1 var(--serif);
+  letter-spacing: .02em;
   cursor: pointer;
   transition: transform .2s var(--ease-out), box-shadow .2s, background .2s, opacity .2s;
   touch-action: manipulation;
@@ -160,72 +113,122 @@ body::after {
   background: none;
   border: 0;
   padding: 12px;
-  font: 400 19px var(--print);
+  font: italic 500 18px var(--serif);
   color: var(--on-desk-soft);
   text-decoration: underline;
   text-underline-offset: 4px;
   cursor: pointer;
 }
 
-.eyebrow {
-  margin: 0 0 18px;
-  font: 500 12px/1 var(--mono);
-  letter-spacing: .22em;
-  text-transform: uppercase;
-  color: var(--on-desk-soft);
+/* ───────── El cuaderno ───────── */
+.book {
+  --spiral-top: 18px;
+  position: relative;
+  display: grid;
+  width: min(100%, 440px);
+  margin-left: 10px; /* lugar para la espiral */
+}
+.book::after { /* espiral: es del cuaderno, no de cada hoja */
+  content: "";
+  position: absolute;
+  z-index: 5;
+  top: var(--spiral-top);
+  bottom: var(--spiral-top);
+  left: -13px;
+  width: 38px;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 17px 4.6px at 19px 11px, transparent 58%, #0d0d0d 62%, #5b5b5b 74%, #0d0d0d 88%, transparent 92%) 0 0 / 38px 22px repeat-y;
+  filter: drop-shadow(1px 2px 1px rgba(0, 0, 0, .5));
 }
 
-/* ───────── 1. Candado ───────── */
-.notebook--lock {
-  padding-top: 40px;
-  padding-bottom: 38px;
-  text-align: center;
-  transform-origin: left center;
-}
-.notebook--lock.is-turning { animation: page-turn 1.1s cubic-bezier(.5, 0, .3, 1) forwards; }
-@keyframes page-turn {
-  0% { transform: perspective(1600px) rotateY(0); }
-  100% { transform: perspective(1600px) rotateY(-105deg); opacity: 0; }
-}
-
-.lock__title {
-  margin: 0;
-  font: 400 clamp(60px, 18vw, 82px)/1 var(--print);
-  letter-spacing: .02em;
+.notebook {
+  position: relative;
+  padding: 34px 24px 34px 50px;
+  border-radius: 5px 20px 20px 5px;
+  background: var(--grain), var(--page);
   color: var(--ink);
+  text-align: left;
 }
-.lock__hint {
-  margin: 14px auto 30px;
-  max-width: 28ch;
-  font: 400 21px/1.35 var(--print);
-  color: var(--ink-soft);
+.notebook::before { /* agujeros */
+  content: "";
+  position: absolute;
+  top: var(--spiral-top, 18px);
+  bottom: var(--spiral-top, 18px);
+  left: 12px;
+  width: 12px;
+  background: radial-gradient(circle at 6px 11px, #1b1a19 3.6px, rgba(0, 0, 0, .25) 4.4px, transparent 5px) 0 0 / 12px 22px repeat-y;
+}
+.notebook--lined {
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 39px, var(--rule) 39px 40px) 0 104px / 100% calc(100% - 124px) no-repeat,
+    var(--grain), var(--page);
+}
+
+/* hojas apiladas en la misma celda */
+.page {
+  grid-area: 1 / 1;
+  min-height: min(76svh, 620px);
+  transform-origin: left center;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transition: transform 1.15s cubic-bezier(.45, 0, .25, 1), box-shadow 1.15s;
+}
+.page--gift {
+  /* las hojas de abajo asoman un poco: se nota que es un cuaderno */
+  box-shadow:
+    3px 3px 0 -1px #d6cfbf,
+    6px 6px 0 -2px #c9c1b0,
+    0 36px 60px -24px rgba(0, 0, 0, .85),
+    0 2px 6px rgba(0, 0, 0, .35);
+}
+.page--letter, .page--lock { box-shadow: 0 1px 2px rgba(0, 0, 0, .18); }
+.page.is-turned {
+  transform: perspective(2200px) rotateY(-180deg);
+  pointer-events: none;
+}
+.page.is-turning { box-shadow: 30px 0 40px -20px rgba(0, 0, 0, .35); }
+
+/* ───────── Hoja 1: candado ───────── */
+.page--lock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.lock__title {
+  margin: 0 0 34px;
+  font: italic 500 clamp(58px, 17vw, 78px)/1 var(--serif);
+  letter-spacing: -.01em;
+  color: var(--ink);
 }
 
 .code {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 26px;
+  gap: 28px;
   width: 100%;
 }
 .code__field {
   position: relative;
-  width: min(100%, 320px);
+  width: min(100%, 300px);
 }
 .code__tiles {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: clamp(8px, 3vw, 14px);
 }
-/* cada casilla es un renglón donde se escribe en birome roja */
+/* cada casilla es un renglón donde la letra aparece en rojo, como en la carta */
 .tile {
   position: relative;
-  height: clamp(54px, 15vw, 64px);
+  height: clamp(52px, 14vw, 62px);
   display: grid;
   place-items: end center;
-  padding-bottom: 4px;
-  border-bottom: 2px solid rgba(36, 35, 34, .35);
-  font: 400 clamp(36px, 11vw, 46px)/1 var(--print);
+  padding-bottom: 2px;
+  border-bottom: 1.5px solid rgba(36, 35, 34, .4);
+  font: 600 clamp(34px, 10vw, 44px)/1 var(--serif);
   color: var(--pen);
   transition: border-color .2s;
 }
@@ -233,11 +236,10 @@ body::after {
 .tile.is-active { border-bottom-color: var(--pen); }
 .tile.is-active:not(.is-filled)::after {
   content: "";
-  width: 2px;
-  height: 58%;
-  margin-bottom: 4px;
+  width: 1.5px;
+  height: 55%;
+  margin-bottom: 6px;
   background: var(--pen);
-  border-radius: 2px;
   animation: caret 1s steps(1) infinite;
 }
 @keyframes tile-pop { 0% { transform: translateY(4px) scale(.85); opacity: 0; } }
@@ -266,36 +268,51 @@ body::after {
   background: transparent;
   cursor: text;
 }
-
 .code.is-busy .btn { pointer-events: none; }
+
 .code__msg {
-  min-height: 1.3em;
-  margin: -8px 0 0;
-  font: 400 21px/1.25 var(--print);
+  min-height: 1.4em;
+  margin: 16px 0 0;
+  font: italic 500 20px/1.3 var(--serif);
   color: var(--pen);
 }
-
-/* ───────── 2. La carta ───────── */
-.paper {
-  min-height: min(66svh, 520px);
-  padding: 30px 24px 40px 54px;
-  transform: rotate(-.5deg);
+.hint-btn {
+  appearance: none;
+  margin-top: 4px;
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  font: italic 500 18px var(--serif);
+  color: var(--ink-faint);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 4px;
   cursor: pointer;
 }
+.lock__hint {
+  margin: 6px auto 0;
+  max-width: 26ch;
+  font: italic 400 20px/1.35 var(--serif);
+  color: var(--ink-soft);
+  animation: fade-in .5s var(--ease-out);
+}
+@keyframes fade-in { from { opacity: 0; transform: translateY(-4px); } }
+
+/* ───────── Hoja 2: carta ───────── */
+.page--letter { padding-top: 28px; cursor: pointer; }
 .paper__date {
-  margin: 0 0 18px;
+  margin: 0 0 22px;
   text-align: right;
-  font: 400 19px/1 var(--print);
+  font: italic 400 18px/1 var(--serif);
   color: var(--ink-faint);
 }
 .paper__greeting {
-  margin: 0 0 6px;
-  font: 400 30px/40px var(--cursive);
-  color: var(--ink);
+  margin: 0 0 4px;
+  font: italic 600 32px/40px var(--serif);
 }
 .paper__lines p {
   margin: 0;
-  font: 400 clamp(22px, 6.2vw, 26px)/40px var(--cursive);
+  font: italic 400 clamp(24px, 6.6vw, 28px)/40px var(--serif);
   color: var(--ink);
 }
 .ink__w { display: inline-block; white-space: nowrap; }
@@ -308,41 +325,58 @@ body::after {
 }
 .paper__lines p.is-instant .ink__c { animation: none; }
 
-.letter__next { margin-top: 28px; min-width: 190px; }
-.letter__next.is-ready { animation: nudge 2.4s 1s ease-in-out infinite; }
+.book__next { margin-top: 26px; min-width: 200px; }
+.book__next.is-ready { animation: nudge 2.4s 1s ease-in-out infinite; }
 @keyframes nudge { 0%, 80%, 100% { transform: none; } 88% { transform: translateY(-3px); } }
 
-/* ───────── 3. El regalo ───────── */
-.screen--gift {
-  justify-content: flex-start;
-  padding-top: calc(40px + env(safe-area-inset-top, 0px));
+/* ───────── Hoja 3: la entrada pegada con cinta ───────── */
+.page--gift {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-left: 40px;
+  padding-right: 14px;
 }
-
-.ticket-shadow {
-  --rx: 0deg;
-  --ry: 0deg;
-  width: min(100%, 380px);
+.glued {
+  position: relative;
+  width: 100%;
+  transform: rotate(-2deg);
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
-  filter: drop-shadow(0 30px 34px rgba(0, 0, 0, .6)) drop-shadow(0 2px 3px rgba(0, 0, 0, .4));
-  transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry));
-  transition: transform .4s var(--ease-out);
 }
+.tape {
+  position: absolute;
+  z-index: 3;
+  width: 74px;
+  height: 24px;
+  background: linear-gradient(180deg, rgba(246, 240, 222, .78), rgba(232, 224, 200, .72));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .15);
+  pointer-events: none;
+  /* bordes cortados a mano */
+  clip-path: polygon(3% 8%, 12% 0, 25% 6%, 40% 0, 55% 7%, 70% 0, 85% 6%, 97% 0, 100% 92%, 88% 100%, 72% 94%, 58% 100%, 42% 93%, 27% 100%, 12% 94%, 0 100%);
+}
+.tape--tl { top: -11px; left: -18px; transform: rotate(-38deg); }
+.tape--br { bottom: -11px; right: -18px; transform: rotate(-38deg); }
+.page__note {
+  margin: 30px 0 0;
+  font: italic 500 20px var(--serif);
+  color: var(--ink-faint);
+}
+
 .ticket-wrap {
-  --stub: 118px;
-  --notch: 14px;
+  --stub: 66px;
   position: relative;
-  border-radius: 14px;
+  border-radius: 4px;
   overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .25), 0 8px 16px -10px rgba(0, 0, 0, .45);
   -webkit-mask:
-    radial-gradient(circle var(--notch) at left calc(100% - var(--stub)), #0000 97%, #000),
-    radial-gradient(circle var(--notch) at right calc(100% - var(--stub)), #0000 97%, #000);
-  -webkit-mask-composite: source-in;
+    radial-gradient(circle 7px at calc(100% - var(--stub)) 0, #0000 97%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle 7px at calc(100% - var(--stub)) 100%, #0000 97%, #000) bottom / 100% 51% no-repeat;
   mask:
-    radial-gradient(circle var(--notch) at left calc(100% - var(--stub)), #0000 97%, #000),
-    radial-gradient(circle var(--notch) at right calc(100% - var(--stub)), #0000 97%, #000);
-  mask-composite: intersect;
+    radial-gradient(circle 7px at calc(100% - var(--stub)) 0, #0000 97%, #000) top / 100% 51% no-repeat,
+    radial-gradient(circle 7px at calc(100% - var(--stub)) 100%, #0000 97%, #000) bottom / 100% 51% no-repeat;
 }
 /* hasta que la lámina está pintada, la entrada no se ve */
 .ticket-wrap.is-covered { background: linear-gradient(135deg, #b48c3c, #ead199 30%, #c49b4b 55%, #f0dcaa 80%, #a88130); }
@@ -359,123 +393,122 @@ body::after {
 }
 .scratch.is-clearing { opacity: 0; pointer-events: none; }
 
+/* Entrada de show clásica: cartulina impresa + talón troquelado */
 .ticket {
   position: relative;
-  background: #fbf6ec;
-  color: var(--ink);
+  display: grid;
+  grid-template-columns: 1fr var(--stub);
+  color: #1d1c1b;
   text-align: left;
+  font-family: var(--mono);
+  background:
+    repeating-linear-gradient(115deg, rgba(161, 29, 29, .035) 0 1px, transparent 1px 6px),
+    linear-gradient(180deg, #fbf8f1, #f3eee2);
 }
 .ticket::after { /* brillo que cruza al revelarse */
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .55) 48%, transparent 60%);
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .6) 48%, transparent 60%);
   transform: translateX(-120%);
 }
 .ticket.is-shining::after { animation: shine 1.6s .2s var(--ease-out); }
 @keyframes shine { to { transform: translateX(120%); } }
 
-.ticket__head {
-  position: relative;
-  padding: 22px 22px 20px;
-  color: var(--cream);
-  background:
-    repeating-radial-gradient(circle at 110% -20%, rgba(230, 205, 146, .08) 0 1px, transparent 1px 9px),
-    linear-gradient(160deg, #283057, var(--night) 60%, #171b33);
+.ticket__main {
+  min-width: 0;
+  padding: 12px 12px 12px 16px;
+  border-left: 7px solid var(--pen);
 }
-.ticket__kicker {
+.ticket__top {
   display: flex;
   justify-content: space-between;
-  font: 500 11px/1 var(--mono);
-  letter-spacing: .18em;
+  gap: 8px;
+  font: 500 8.5px/1 var(--mono);
+  letter-spacing: .14em;
   text-transform: uppercase;
-  color: var(--gold-light);
+  color: var(--pen);
 }
 .ticket__artist {
-  margin: 16px 0 2px;
-  font: italic 600 clamp(40px, 12vw, 50px)/.95 var(--serif);
-  letter-spacing: -.01em;
-  background: linear-gradient(180deg, #f7e6bd, #d9b46a 70%, #b98d3e);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  margin: 8px 0 1px;
+  font: 700 clamp(20px, 6.6vw, 27px)/1 var(--mono);
+  letter-spacing: -.02em;
+  text-transform: uppercase;
 }
 .ticket__tour {
-  margin: 6px 0 0;
-  font: 400 15px var(--serif);
-  color: rgba(243, 231, 207, .75);
-}
-
-.ticket__grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px 18px;
-  margin: 0;
-  padding: 20px 22px 22px;
-}
-.ticket__grid > div { min-width: 0; }
-.ticket__grid .span-2 { grid-column: span 2; }
-.ticket__grid dt {
-  margin-bottom: 3px;
-  font: 500 10.5px/1 var(--mono);
-  letter-spacing: .16em;
+  margin: 0 0 9px;
+  font: 500 9.5px/1.2 var(--mono);
+  letter-spacing: .1em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: #6b655c;
 }
-.ticket__grid dd {
-  margin: 0;
-  font: 600 17px/1.25 var(--serif);
-  color: var(--ink);
+.ticket__when {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(29, 28, 27, .18);
+  border-bottom: 1px solid rgba(29, 28, 27, .18);
+  font: 700 clamp(14px, 4.2vw, 17px)/1.1 var(--mono);
+  text-transform: uppercase;
 }
-.ticket__grid dd small {
-  display: block;
-  font: 400 14px var(--serif);
-  color: var(--ink-soft);
+.ticket__when span:last-child { margin-left: auto; color: var(--pen); }
+.ticket__rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  margin: 8px 0 0;
+  font: 500 9.5px/1.25 var(--mono);
+  text-transform: uppercase;
 }
-.ticket__grid .big { font-size: 26px; font-variant-numeric: tabular-nums; }
+.ticket__rows dt { color: #8a8378; letter-spacing: .08em; }
+.ticket__rows dd { margin: 0; font-weight: 600; min-width: 0; }
 
 .ticket__stub {
   position: relative;
-  height: var(--stub, 118px);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 0 22px;
-  background: #efe7d6;
+  justify-content: space-between;
+  padding: 12px 4px 10px;
+  background: #efe9db;
 }
 .ticket__stub::before { /* troquel */
   content: "";
   position: absolute;
-  top: 0;
-  left: 18px;
-  right: 18px;
-  border-top: 2px dashed rgba(36, 35, 34, .22);
-}
-.ticket__barcode { flex: 1; height: 54px; min-width: 0; }
-.ticket__code {
-  font: 500 11px/1.5 var(--mono);
-  letter-spacing: .12em;
-  color: var(--ink-soft);
-  text-align: right;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  border-left: 1.5px dashed rgba(29, 28, 27, .3);
 }
 .ticket__admit {
-  display: block;
-  font: 600 24px/1 var(--serif);
-  letter-spacing: 0;
+  font: 600 8px/1 var(--mono);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: #6b655c;
+}
+.ticket__qty {
+  font: 700 30px/1 var(--mono);
   color: var(--pen);
+}
+.ticket__barcode { width: 34px; height: 64px; }
+.ticket__code {
+  font: 500 7.5px/1 var(--mono);
+  letter-spacing: .1em;
+  color: #6b655c;
 }
 
 /* ───────── Pregunta ───────── */
 .gift__rest { width: min(100%, 440px); }
-.reveal-in { animation: screen-in .9s var(--ease-out) both; }
+.reveal-in { animation: rise-in .9s var(--ease-out) both; }
+@keyframes rise-in { from { opacity: 0; transform: translateY(18px); } }
 
-.question { margin-top: 44px; }
+.question { margin-top: 40px; }
 .question__text {
   margin: 0 0 22px;
-  font: 400 clamp(46px, 14vw, 60px)/1.05 var(--print);
+  font: italic 500 clamp(52px, 15vw, 66px)/1 var(--serif);
   color: var(--on-desk);
-  text-wrap: balance;
 }
 .question__actions {
   position: relative;
@@ -483,7 +516,7 @@ body::after {
   justify-content: center;
   align-items: flex-start;
   gap: 14px;
-  min-height: 150px;
+  min-height: 170px;
 }
 .question__actions .btn { min-width: 128px; }
 .btn--no {
@@ -492,10 +525,10 @@ body::after {
 .btn--no.is-running { position: absolute; }
 
 /* ───────── Después del sí ───────── */
-.after { margin-top: 8px; }
+.after { margin-top: 36px; }
 .after__yes {
   margin: 0 0 30px;
-  font: 400 clamp(32px, 9vw, 40px)/1.15 var(--print);
+  font: italic 500 clamp(32px, 9vw, 40px)/1.15 var(--serif);
   color: var(--on-desk);
   text-wrap: balance;
 }
@@ -510,7 +543,7 @@ body::after {
 }
 .card__title {
   margin: 0 0 14px;
-  font: 400 26px/1 var(--print);
+  font: italic 600 26px/1 var(--serif);
   color: var(--ink);
 }
 
@@ -526,8 +559,8 @@ body::after {
 }
 .countdown__num {
   display: block;
-  font: 600 clamp(28px, 9vw, 38px)/1 var(--serif);
-  font-variant-numeric: tabular-nums;
+  font: 600 clamp(32px, 10vw, 42px)/1 var(--serif);
+  font-variant-numeric: lining-nums tabular-nums;
 }
 .countdown__label {
   display: block;
@@ -537,7 +570,7 @@ body::after {
   text-transform: uppercase;
   color: var(--ink-soft);
 }
-.countdown__done { margin: 0; font: 400 32px/1.2 var(--print); color: var(--pen); }
+.countdown__done { margin: 0; font: italic 600 32px/1.2 var(--serif); color: var(--pen); }
 
 .actions {
   display: grid;
@@ -550,8 +583,8 @@ body::after {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 15px 12px;
-  font-size: 16px;
+  padding: 14px 12px;
+  font-size: 18px;
   text-decoration: none;
 }
 .actions svg { width: 18px; height: 18px; flex: none; }
@@ -571,7 +604,7 @@ body::after {
   font: 500 12px var(--mono);
   color: var(--ink-faint);
 }
-.setlist__t { flex: 1; font: 400 21px/1.3 var(--cursive); }
+.setlist__t { flex: 1; font: 500 21px/1.25 var(--serif); }
 .setlist__play {
   width: 30px;
   height: 30px;
@@ -633,7 +666,7 @@ body::after {
   background: rgba(14, 13, 12, .95);
 }
 .viewer::backdrop { background: rgba(14, 13, 12, .6); }
-.viewer[open] { display: flex; flex-direction: column; animation: screen-in .35s var(--ease-out); }
+.viewer[open] { display: flex; flex-direction: column; animation: rise-in .35s var(--ease-out); }
 .viewer__bar {
   display: flex;
   justify-content: space-between;
@@ -685,7 +718,7 @@ body::after {
   margin: 0;
   padding: 10px 24px calc(22px + env(safe-area-inset-bottom, 0px));
   text-align: center;
-  font: 400 24px/1.25 var(--print);
+  font: italic 500 22px/1.25 var(--serif);
 }
 @media (hover: none) {
   .viewer__nav { display: none; } /* en el celular se desliza */
@@ -694,13 +727,13 @@ body::after {
 /* ───────── Cierre ───────── */
 .closing {
   margin: 40px 0 6px;
-  font: 400 clamp(30px, 8.5vw, 38px)/1.3 var(--cursive);
+  font: italic 500 clamp(32px, 9vw, 40px)/1.25 var(--serif);
   color: var(--on-desk);
   text-wrap: balance;
 }
 .closing__sign {
   margin: 0 0 30px;
-  font: 400 30px/1 var(--print);
+  font: italic 600 28px/1 var(--serif);
   color: var(--pen-on-desk);
 }
 
@@ -716,6 +749,7 @@ body::after {
 
 @media (min-width: 720px) {
   .notebook { padding-right: 36px; }
+  .page--gift { padding-right: 28px; }
   .photos { columns: 3; }
 }
 

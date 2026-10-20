@@ -13,7 +13,7 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=La+Belle+Aurore&family=Shadows+Into+Light&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="styles.css">
   <!-- scripts clásicos (no módulos) para que también funcione abriendo el archivo con doble clic -->
   <script defer src="gift.enc.js"></script>
@@ -22,49 +22,53 @@
 <body>
   <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
 
-  <main>
-    <!-- 1. Candado -->
-    <section class="screen screen--lock" id="lock" aria-labelledby="lock-title">
-      <div class="notebook notebook--lock" id="lock-page">
-      <h1 class="lock__title" id="lock-title">Para Lu</h1>
-      <p class="lock__hint">Hay una palabra escondida en la carta.<br>Buscá las letras resaltadas.</p>
-
-      <form class="code" id="code-form" novalidate onsubmit="event.preventDefault()">
-        <label class="sr-only" for="code-input">Palabra secreta</label>
-        <div class="code__field">
-          <div class="code__tiles" id="code-tiles" aria-hidden="true"></div>
-          <input class="code__input" id="code-input" type="text" inputmode="text" maxlength="6"
-                 autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false"
-                 enterkeyhint="go">
+  <main class="stage">
+    <!-- Un solo cuaderno: las hojas están apiladas y al girar una aparece la de abajo -->
+    <div class="book" id="book">
+      <!-- Hoja 3: la entrada pegada -->
+      <section class="notebook page page--gift" id="page-gift" aria-label="Tu regalo">
+        <div class="glued" id="glued" hidden>
+          <div class="ticket-wrap is-covered" id="ticket-wrap">
+            <div class="ticket" id="ticket"></div>
+            <canvas class="scratch" id="scratch" aria-hidden="true"></canvas>
+          </div>
+          <span class="tape tape--tl" aria-hidden="true"></span>
+          <span class="tape tape--br" aria-hidden="true"></span>
         </div>
-        <button class="btn btn--ink" id="code-submit" type="submit">Abrir la carta</button>
-        <p class="code__msg" id="code-msg" role="status" aria-live="polite"></p>
-      </form>
-      </div>
-    </section>
+        <p class="page__note" id="gift-note" hidden>Rascá la entrada</p>
+      </section>
 
-    <!-- 2. La carta -->
-    <section class="screen screen--letter" id="letter" hidden>
-      <article class="notebook notebook--lined paper" id="paper">
+      <!-- Hoja 2: la carta -->
+      <section class="notebook notebook--lined page page--letter" id="page-letter" aria-label="Carta">
         <p class="paper__date" id="paper-date"></p>
         <p class="paper__greeting" id="paper-greeting"></p>
         <div class="paper__lines" id="intro-lines" aria-live="polite"></div>
-      </article>
-      <button class="btn btn--ghost letter__next" id="intro-next" type="button" disabled>Seguir</button>
-    </section>
+      </section>
 
-    <!-- 3. El regalo -->
-    <section class="screen screen--gift" id="gift" hidden>
-      <p class="eyebrow" id="gift-eyebrow">Algo para vos</p>
-      <div class="ticket-shadow" id="ticket-shadow">
-        <div class="ticket-wrap">
-          <div class="ticket" id="ticket"></div>
-          <canvas class="scratch" id="scratch" aria-hidden="true"></canvas>
-        </div>
-      </div>
-      <button class="link-btn" id="scratch-skip" type="button" hidden>¿No te deja rascar? Tocá acá</button>
-      <div class="gift__rest" id="gift-rest"></div>
-    </section>
+      <!-- Hoja 1: el candado -->
+      <section class="notebook page page--lock" id="page-lock" aria-labelledby="lock-title">
+        <h1 class="lock__title" id="lock-title">Para Lu</h1>
+
+        <form class="code" id="code-form" novalidate onsubmit="event.preventDefault()">
+          <label class="sr-only" for="code-input">Palabra secreta</label>
+          <div class="code__field">
+            <div class="code__tiles" id="code-tiles" aria-hidden="true"></div>
+            <input class="code__input" id="code-input" type="text" inputmode="text" maxlength="6"
+                   autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false"
+                   enterkeyhint="go">
+          </div>
+          <button class="btn btn--ink" id="code-submit" type="submit">Abrir</button>
+        </form>
+
+        <p class="code__msg" id="code-msg" role="status" aria-live="polite"></p>
+        <button class="hint-btn" id="hint-btn" type="button" aria-expanded="false" aria-controls="lock-hint">¿Pista?</button>
+        <p class="lock__hint" id="lock-hint" hidden>Hay una palabra escondida en la carta.<br>Buscá las letras resaltadas.</p>
+      </section>
+    </div>
+
+    <button class="btn btn--ghost book__next" id="intro-next" type="button" hidden>Seguir</button>
+    <button class="link-btn" id="scratch-skip" type="button" hidden>¿No te deja rascar? Tocá acá</button>
+    <div class="gift__rest" id="gift-rest"></div>
   </main>
 </body>
 </html>
