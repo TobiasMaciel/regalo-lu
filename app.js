@@ -862,7 +862,7 @@ function openViewer(photos, captions, start) {
 const confetti = (() => {
   const canvas = $("#confetti");
   const ctx = canvas.getContext("2d");
-  const COLORS = ["#a11d1d", "#c7302f", "#b98d3e", "#e3c47e", "#fbf6ec", "#ffffff"];
+  const COLORS = ["#c2456b", "#e07a9a", "#f4b6c8", "#ffffff", "#fbeef1", "#e3c47e"];
   let parts = [];
   let raf = 0;
 

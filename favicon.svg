@@ -7,5 +7,5 @@
   <g fill="none" stroke="#3a3a3a" stroke-width="2.2">
     <path d="M4 12h12M4 22h12M4 32h12M4 42h12M4 52h12" stroke-linecap="round"/>
   </g>
-  <text x="38" y="45" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="34" fill="#a11d1d">L</text>
+  <text x="38" y="45" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="34" fill="#c2456b">L</text>
 </svg>
