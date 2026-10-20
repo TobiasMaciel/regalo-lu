@@ -178,9 +178,9 @@ async function turnAway(page) {
 function buildBook(gift, restoring) {
   const photos = photoSlots(gift);
   const n = photos.frames.length;
-  // 1 foto en la carta, 1 bajo la entrada, la última en el cierre y las del medio de a dos
+  // 1 foto en la carta, 1 bajo la entrada, la última en el cierre y las del medio en collages de hasta 4
   const middle = [];
-  for (let i = 2; i < n - 1; i += 2) middle.push(photos.frames.slice(i, Math.min(i + 2, n - 1)));
+  for (let i = 2; i < n - 1; i += 4) middle.push(photos.frames.slice(i, Math.min(i + 4, n - 1)));
 
   const pages = [
     letterPage(gift, photos.frames[0], restoring),
@@ -738,9 +738,24 @@ function setlistPage(gift) {
   return page;
 }
 
+// posiciones del collage según cuántas fotos entran en la hoja (x, y, ancho en %; giro en grados)
+const COLLAGE = {
+  1: [[16, 14, 70, -3]],
+  2: [[2, 2, 62, -5], [34, 46, 62, 5]],
+  3: [[2, 0, 58, -6], [40, 24, 56, 6], [6, 56, 56, 3]],
+  4: [[0, 0, 56, -6], [44, 4, 54, 5], [4, 50, 54, 4], [46, 52, 52, -5]],
+};
+
 function photoPage(frames) {
   const page = makePage("page--photos", "Fotos");
-  page.body.append(...frames);
+  frames.forEach((frame, i) => {
+    const [x, y, w, tilt] = COLLAGE[frames.length][i];
+    frame.style.setProperty("--x", `${x}%`);
+    frame.style.setProperty("--y", `${y}%`);
+    frame.style.setProperty("--w", `${w}%`);
+    frame.style.setProperty("--tilt", `${tilt}deg`);
+  });
+  page.body.append(el("div", { class: "collage" }, frames));
   return page;
 }
 
@@ -847,7 +862,7 @@ function openViewer(photos, captions, start) {
 const confetti = (() => {
   const canvas = $("#confetti");
   const ctx = canvas.getContext("2d");
-  const COLORS = ["#a11d1d", "#e2675d", "#c99a45", "#e9cd8f", "#ebe5d8", "#fbf6ec"];
+  const COLORS = ["#a11d1d", "#c7302f", "#b98d3e", "#e3c47e", "#fbf6ec", "#ffffff"];
   let parts = [];
   let raf = 0;
 
@@ -928,6 +943,7 @@ const saved = store.get();
 if (saved?.gift) {
   // recarga: el cuaderno se rearma ya abierto en la hoja donde estaba
   state = saved;
+  $("#page-intro").classList.add("is-turned", "is-gone");
   $("#page-lock").classList.add("is-turned", "is-gone");
   const pages = buildBook(state.gift, true);
   const at = Math.min(state.page || 0, pages.length - 1);
@@ -936,5 +952,15 @@ if (saved?.gift) {
   pages[at].onEnter?.();
 } else {
   initLock();
+  // al entrar se ve la carta; al segundo la hoja gira sola (o antes, si la toca)
+  const intro = $("#page-intro");
+  let turned = false;
+  const turnIntro = () => {
+    if (turned) return;
+    turned = true;
+    turnAway(intro);
+  };
+  intro.addEventListener("click", turnIntro);
+  Promise.race([document.fonts.ready, sleep(1500)]).then(() => sleep(1300)).then(turnIntro);
 }
 })();

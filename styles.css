@@ -1,6 +1,6 @@
-/* ───────── Tokens: cuaderno sobre el escritorio ───────── */
+/* ───────── Tokens: cuaderno sobre un escritorio de madera clara ───────── */
 :root {
-  --desk: #1c1b1a;
+  --desk: #d4b48a;
   --page: #ebe5d8;
   --page-2: #e0d8c7;
   --rule: rgba(60, 70, 90, .16);
@@ -17,7 +17,7 @@
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .22 0 0 0 .45 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   --ease-out: cubic-bezier(.2, .7, .2, 1);
   --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -33,7 +33,7 @@ body {
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
 }
-/* paño del escritorio + luz cenital */
+/* escritorio de madera clara: vetas + tablas + luz suave */
 body::before, body::after {
   content: "";
   position: fixed;
@@ -42,12 +42,14 @@ body::before, body::after {
   z-index: 0;
 }
 body::before {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  opacity: .06;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 238px, rgba(110, 70, 30, .28) 238px 240px, rgba(255, 240, 215, .25) 240px 241px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.004 .09' numOctaves='4' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .28 0 0 0 0 .1 0 0 0 .9 -.25'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E") 0 0 / 600px 240px,
+    linear-gradient(170deg, #dcc09a, #cfac80 55%, #c7a273);
 }
 body::after {
-  background: radial-gradient(90% 70% at 50% 30%, rgba(255, 240, 215, .07), transparent 60%),
-              radial-gradient(130% 100% at 50% 40%, transparent 50%, rgba(0, 0, 0, .45));
+  background: radial-gradient(90% 70% at 50% 30%, rgba(255, 248, 235, .35), transparent 65%),
+              radial-gradient(140% 110% at 50% 40%, transparent 55%, rgba(90, 55, 20, .3));
 }
 
 [hidden] { display: none !important; }
@@ -164,8 +166,8 @@ body::after {
   box-shadow:
     3px 3px 0 -1px #d6cfbf,
     6px 6px 0 -2px #c9c1b0,
-    0 36px 60px -24px rgba(0, 0, 0, .85),
-    0 2px 6px rgba(0, 0, 0, .35);
+    0 34px 50px -22px rgba(70, 40, 10, .6),
+    0 2px 6px rgba(70, 40, 10, .3);
 }
 .page:not(.is-bottom) { box-shadow: 0 1px 2px rgba(0, 0, 0, .18); }
 .page.is-turned {
@@ -210,6 +212,36 @@ body::after {
   font: italic 600 32px/1.05 var(--serif);
   color: var(--ink);
 }
+
+/* ───────── La carta escrita (portada) ───────── */
+.page--intro { padding-top: 22px; padding-bottom: 26px; cursor: pointer; }
+.page--intro.notebook--lined {
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 27px, var(--rule) 27px 28px) 0 132px / 100% calc(100% - 150px) no-repeat,
+    var(--grain), var(--page);
+}
+.intro__title {
+  margin: 0;
+  text-align: center;
+  font: 400 clamp(46px, 13vw, 58px)/1 var(--serif);
+  letter-spacing: .02em;
+  color: var(--ink);
+}
+.intro__sub {
+  margin: 4px 0 30px;
+  text-align: center;
+  font: 500 17px/1 var(--serif);
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.intro__text {
+  margin: 0;
+  font: italic 400 clamp(16px, 4.6vw, 19px)/28px var(--serif);
+  color: var(--ink);
+  text-indent: 1.4em;
+}
+.intro__text em { font-style: inherit; font-weight: 700; color: var(--pen); }
 
 /* ───────── Candado ───────── */
 .page--lock {
@@ -680,12 +712,22 @@ body::after {
   max-width: 200px;
   margin: 34px 0 0 10%;
 }
-.page--photos { padding-left: 44px; padding-right: 18px; }
-.page--photos .page__body { justify-content: space-evenly; gap: 18px; padding-top: 10px; }
-.page--photos .polaroid { width: min(62%, 250px); }
-.page--photos .polaroid--tall { width: min(48%, 200px); }
-.page--photos .polaroid:nth-child(odd) { align-self: flex-start; margin-left: 4%; }
-.page--photos .polaroid:nth-child(even) { align-self: flex-end; margin-right: 4%; }
+/* collage: varias polaroids agrupadas y superpuestas en una misma hoja */
+.page--photos { padding-left: 40px; padding-right: 14px; }
+.collage {
+  position: relative;
+  flex: 1;
+  min-height: 460px;
+}
+.collage .polaroid {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--w);
+  transition: transform .25s var(--ease-out);
+}
+.collage .polaroid--tall { width: calc(var(--w) * .8); }
+.collage .polaroid:hover, .collage .polaroid:focus-visible { z-index: 10; transform: rotate(var(--tilt)) scale(1.04); }
 
 /* ───────── Cierre ───────── */
 .page--final .page__body { justify-content: center; align-items: center; text-align: center; }
