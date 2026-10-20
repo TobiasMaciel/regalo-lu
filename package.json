@@ -1,0 +1,11 @@
+{
+  "name": "regalo-lu",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "encrypt": "node scripts/encrypt.mjs"
+  },
+  "devDependencies": {
+    "sharp": "^0.33.5"
+  }
+}

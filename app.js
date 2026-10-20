@@ -55,11 +55,31 @@ async function decryptGift(password) {
     { name: "PBKDF2", salt: fromB64(enc.salt), iterations: enc.iterations, hash: "SHA-256" },
     baseKey,
     { name: "AES-GCM", length: 256 },
-    false,
+    true, // exportable: se guarda en la sesión para descifrar las fotos tras recargar
     ["decrypt"]
   );
   const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(enc.iv) }, key, fromB64(enc.data));
-  return JSON.parse(new TextDecoder().decode(plain));
+  const raw = new Uint8Array(await crypto.subtle.exportKey("raw", key));
+  return { gift: JSON.parse(new TextDecoder().decode(plain)), key: btoa(String.fromCharCode(...raw)) };
+}
+
+// Las fotos pesan: viven en otro archivo que se carga recién después de desbloquear
+let photosScript;
+function loadPhotosScript() {
+  photosScript ??= new Promise((resolve, reject) => {
+    if (window.FOTOS_ENC) return resolve();
+    document.head.append(el("script", { src: "fotos.enc.js", onload: resolve, onerror: reject }));
+  });
+  return photosScript;
+}
+
+async function decryptPhotos(keyB64) {
+  await loadPhotosScript();
+  const key = await crypto.subtle.importKey("raw", fromB64(keyB64), "AES-GCM", false, ["decrypt"]);
+  return Promise.all((window.FOTOS_ENC || []).map(async (f) => {
+    const buf = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(f.iv) }, key, fromB64(f.data));
+    return { url: URL.createObjectURL(new Blob([buf], { type: f.type })), w: f.w, h: f.h };
+  }));
 }
 
 /* ───────── Navegación entre pantallas ───────── */
@@ -149,14 +169,15 @@ function initLock() {
     form.classList.add("is-busy");
     submit.textContent = "Abriendo…";
     try {
-      const gift = await decryptGift(v);
+      const { gift, key } = await decryptGift(v);
       tilesBox.classList.add("is-ok");
       input.blur();
       vibrate(30);
-      store.set({ gift, revealed: false, answered: false });
+      store.set({ gift, key, revealed: false, answered: false });
+      loadPhotosScript().catch(() => {}); // precarga mientras lee la carta
       $("#envelope").classList.add("is-open");
       await sleep(1700);
-      await playLetter(gift);
+      await playLetter(gift, key);
     } catch (err) {
       if (err instanceof NetworkError) {
         fail("No se pudo cargar. Probá de nuevo en un rato.", false);
@@ -219,7 +240,7 @@ const tapOn = (...targets) => new Promise((resolve) => {
   targets.forEach((t) => t.addEventListener("click", done));
 });
 
-async function playLetter(gift) {
+async function playLetter(gift, key) {
   await go("lock", "letter");
   const paper = $("#paper");
   const lines = $("#intro-lines");
@@ -244,7 +265,7 @@ async function playLetter(gift) {
 
   next.disabled = true;
   await go("letter", "gift");
-  showGift(gift, { revealed: false, answered: false });
+  showGift(gift, { key, revealed: false, answered: false });
 }
 
 /* ───────── 3. Ticket ───────── */
@@ -537,7 +558,7 @@ function enableTilt(target) {
 function showQuestion(gift, state, save, instant) {
   const rest = $("#gift-rest");
   if (state.answered) {
-    rest.replaceChildren(buildAfter(gift));
+    rest.replaceChildren(buildAfter(gift, state.key));
     return;
   }
 
@@ -594,7 +615,7 @@ function showQuestion(gift, state, save, instant) {
     confetti.burst(r.left + r.width / 2, r.top, 160);
     setTimeout(() => confetti.rain(160), 250);
     vibrate([30, 40, 30, 40, 120]);
-    const after = buildAfter(gift);
+    const after = buildAfter(gift, state.key);
     after.classList.add("reveal-in");
     rest.replaceChildren(after);
     after.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -609,7 +630,7 @@ const ICON = {
   play: '<svg viewBox="0 0 10 12" fill="currentColor" aria-hidden="true"><path d="M0 0l10 6-10 6z"/></svg>',
 };
 
-function buildAfter(gift) {
+function buildAfter(gift, key) {
   const s = gift.show;
   return el("div", { class: "after" },
     el("p", { class: "after__yes", text: gift.respuestaSi }),
@@ -627,8 +648,87 @@ function buildAfter(gift) {
             el("span", { class: "setlist__n", text: String(i + 1).padStart(2, "0") }),
             el("span", { class: "setlist__t", text: song }),
             el("span", { class: "setlist__play", html: ICON.play })))))),
+    gift.fotos?.length && key ? photoGrid(gift, key) : null,
     el("p", { class: "closing", text: gift.final }),
     el("p", { class: "closing__sign", text: `— ${gift.firma}` }));
+}
+
+/* ───────── Fotos ───────── */
+
+function photoGrid(gift, key) {
+  const captions = gift.fotos.map((f) => f.texto || "");
+  // casilleros con la proporción ya reservada, se llenan al descifrar
+  const slots = (window.FOTOS_ENC || captions).map((f) => {
+    const slot = el("div", { class: "photo is-loading" });
+    slot.style.aspectRatio = f.w ? `${f.w} / ${f.h}` : "4 / 5";
+    return slot;
+  });
+  const grid = el("div", { class: "photos" }, slots);
+  const section = el("section", { class: "card card--photos" }, el("h3", { class: "card__title", text: "Fotos" }), grid);
+
+  decryptPhotos(key).then((photos) => {
+    grid.replaceChildren(...photos.map((p, i) => {
+      const btn = el("button", { class: "photo", type: "button", "aria-label": captions[i] || `Ver foto ${i + 1}`, onclick: () => openViewer(photos, captions, i) },
+        el("img", { src: p.url, width: p.w, height: p.h, alt: captions[i], loading: "lazy", decoding: "async" }));
+      btn.style.animationDelay = `${Math.min(i, 12) * 60}ms`;
+      return btn;
+    }));
+  }).catch(() => section.remove());
+
+  return section;
+}
+
+function openViewer(photos, captions, start) {
+  let i = start;
+  const img = el("img", { class: "viewer__img", alt: "" });
+  const caption = el("p", { class: "viewer__caption" });
+  const count = el("span", { class: "viewer__count" });
+  const prev = el("button", { class: "viewer__nav viewer__nav--prev", type: "button", "aria-label": "Anterior", text: "‹" });
+  const next = el("button", { class: "viewer__nav viewer__nav--next", type: "button", "aria-label": "Siguiente", text: "›" });
+  const close = el("button", { class: "viewer__close", type: "button", "aria-label": "Cerrar", text: "×" });
+  const stage = el("div", { class: "viewer__stage" }, img);
+  const dialog = el("dialog", { class: "viewer", "aria-label": "Fotos" },
+    el("div", { class: "viewer__bar" }, count, close), stage, prev, next, caption);
+
+  const show = (n, dir = 0) => {
+    i = (n + photos.length) % photos.length;
+    img.src = photos[i].url;
+    img.alt = captions[i];
+    caption.textContent = captions[i];
+    caption.hidden = !captions[i];
+    count.textContent = `${i + 1} / ${photos.length}`;
+    img.classList.remove("from-left", "from-right");
+    if (dir) {
+      void img.offsetWidth;
+      img.classList.add(dir > 0 ? "from-right" : "from-left");
+    }
+  };
+  const single = photos.length < 2;
+  prev.hidden = next.hidden = single;
+  prev.addEventListener("click", () => show(i - 1, -1));
+  next.addEventListener("click", () => show(i + 1, 1));
+  close.addEventListener("click", () => dialog.close());
+  dialog.addEventListener("click", (e) => { if (e.target === dialog || e.target === stage) dialog.close(); });
+  dialog.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft" && !single) show(i - 1, -1);
+    if (e.key === "ArrowRight" && !single) show(i + 1, 1);
+  });
+  dialog.addEventListener("close", () => { dialog.remove(); document.documentElement.classList.remove("no-scroll"); });
+
+  // deslizar para pasar de foto
+  let x0 = null;
+  stage.addEventListener("pointerdown", (e) => { x0 = e.clientX; });
+  stage.addEventListener("pointerup", (e) => {
+    if (x0 == null || single) return;
+    const dx = e.clientX - x0;
+    x0 = null;
+    if (Math.abs(dx) > 45) show(i + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1);
+  });
+
+  document.body.append(dialog);
+  document.documentElement.classList.add("no-scroll");
+  show(start);
+  dialog.showModal();
 }
 
 function countdown(iso) {
@@ -698,7 +798,7 @@ const saved = store.get();
 if (saved?.gift) {
   $("#lock").hidden = true;
   $("#gift").hidden = false;
-  showGift(saved.gift, { revealed: Boolean(saved.revealed), answered: Boolean(saved.answered) });
+  showGift(saved.gift, { key: saved.key, revealed: Boolean(saved.revealed), answered: Boolean(saved.answered) });
 } else {
   initLock();
 }

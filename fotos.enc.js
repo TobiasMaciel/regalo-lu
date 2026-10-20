@@ -1,0 +1,1 @@
+window.FOTOS_ENC = [];
