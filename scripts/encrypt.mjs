@@ -1,4 +1,4 @@
-// Cifra privado/gift.json con la contraseña y escribe gift.enc.json (lo único que se publica).
+// Cifra privado/gift.json con la contraseña y escribe gift.enc.js (lo único que se publica).
 // Uso: node scripts/encrypt.mjs <CONTRASEÑA>
 import { readFile, writeFile } from "node:fs/promises";
 import { webcrypto as crypto } from "node:crypto";
@@ -38,5 +38,6 @@ const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM",
 
 const b64 = (u8) => Buffer.from(u8).toString("base64");
 const out = { v: 1, iterations: ITERATIONS, salt: b64(salt), iv: b64(iv), data: b64(ciphertext) };
-await writeFile(new URL("../gift.enc.json", import.meta.url), JSON.stringify(out, null, 2) + "\n");
-console.log("gift.enc.json generado.");
+// Script clásico (no JSON + fetch) para que la página también funcione abierta como archivo local
+await writeFile(new URL("../gift.enc.js", import.meta.url), `window.GIFT_ENC = ${JSON.stringify(out, null, 2)};\n`);
+console.log("gift.enc.js generado.");

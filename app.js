@@ -1,5 +1,7 @@
-// Regalo para Lu — todo el contenido del regalo llega cifrado en gift.enc.json
+// Regalo para Lu — todo el contenido del regalo llega cifrado en gift.enc.js
 // y solo se puede leer con la palabra escondida en la carta.
+(() => {
+"use strict";
 
 const LEN = 6;
 const STORE_KEY = "regalo-lu:v1";
@@ -41,17 +43,12 @@ function normalizePassword(raw) {
 }
 
 const fromB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
-const encrypted = fetch("gift.enc.json", { cache: "no-cache" }).then((r) => {
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
-});
-encrypted.catch(() => {}); // el error se muestra al intentar abrir
 
 class NetworkError extends Error {}
 
 async function decryptGift(password) {
-  let enc;
-  try { enc = await encrypted; } catch (err) { throw new NetworkError(err.message); }
+  const enc = window.GIFT_ENC; // definido por gift.enc.js
+  if (!enc) throw new NetworkError("gift.enc.js no cargó");
   const te = new TextEncoder();
   const baseKey = await crypto.subtle.importKey("raw", te.encode(normalizePassword(password)), "PBKDF2", false, ["deriveKey"]);
   const key = await crypto.subtle.deriveKey(
@@ -702,3 +699,4 @@ if (saved?.gift) {
 } else {
   initLock();
 }
+})();

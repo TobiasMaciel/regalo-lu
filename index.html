@@ -15,7 +15,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="styles.css">
-  <script type="module" src="app.js"></script>
+  <!-- scripts clásicos (no módulos) para que también funcione abriendo el archivo con doble clic -->
+  <script defer src="gift.enc.js"></script>
+  <script defer src="app.js"></script>
 </head>
 <body>
   <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
@@ -45,12 +47,6 @@
         <button class="btn btn--ink" id="code-submit" type="submit">Abrir la carta</button>
         <p class="code__msg" id="code-msg" role="status" aria-live="polite"></p>
       </form>
-      <script>
-        // Abierta con doble clic (file://) los módulos no cargan: avisar en vez de no hacer nada
-        if (location.protocol === "file:") {
-          document.getElementById("code-msg").textContent = "Abrila desde el link (o con un servidor local), no con doble clic 🙂";
-        }
-      </script>
     </section>
 
     <!-- 2. La carta -->
