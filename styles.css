@@ -817,6 +817,7 @@ body::after {
 .stuck--final { width: min(60%, 240px); margin-bottom: 30px; }
 .closing {
   margin: 0 0 6px;
+  white-space: pre-line; /* "Feliz cumpleaños." y "Te amo." en dos renglones */
   font: italic 400 44px/1.1 var(--serif);
   color: var(--ink);
 }
