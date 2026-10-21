@@ -639,10 +639,141 @@
     });
   }
 
+  /* ───────── íconos en pixel art (modo juego) ───────── */
+  var ICONS = {
+    // la lata (cuerpo y tapa por separado, para que la tapa pueda salir volando)
+    canBody: {
+      rows: [
+        ".oooooooooooo.",
+        "orhhRRRRRRRrro",
+        "orhRRRRRRRRrro",
+        "orrrrrrrrrrrro",
+        "orhRRRRRRRRrro",
+        "orhRRwwwwRRrro",
+        "orhRwwwwwwRrro",
+        "orhRwkwwkwRrro",
+        "orhRwwwwwwRrro",
+        "orhRkkkkkkRrro",
+        "orhRwwwwwwRrro",
+        "orhRRwwwwRRrro",
+        "orhRRRRRRRRrro",
+        "orhRRRRRRRRrro",
+        "orhRRRRRRRRrro",
+        "orrrrrrrrrrrro",
+        "orhRRRRRRRRrro",
+        "orhRRRRRRRRrro",
+        "orhhRRRRRRRrro",
+        ".oooooooooooo."
+      ],
+      pal: { o: "#3a1414", R: "#d42a2a", r: "#9e1a1d", h: "#ff7a6b", w: "#fbe9c4", k: "#3b2313" }
+    },
+    canLid: {
+      rows: [
+        ".oooooooooooooo.",
+        "oSWWWWWWWWWWWWSo",
+        "oSSSSSSSSSSSSSSo",
+        ".oooooooooooooo."
+      ],
+      pal: { o: "#3d3d3d", S: "#a9a9a9", W: "#f2f2f2" }
+    },
+    heart: {
+      rows: [
+        ".PP.PP.",
+        "PWPPPPP",
+        "PPPPPPP",
+        ".PPPPP.",
+        "..PPP..",
+        "...P..."
+      ],
+      pal: { P: "#e0548c", W: "#ffd6e3" }
+    },
+    star: {
+      rows: [
+        "....Y....",
+        "...YYY...",
+        "YYYYWYYYY",
+        ".YYYYYYY.",
+        "..YYYYY..",
+        ".YYY.YYY.",
+        "YY.....YY"
+      ],
+      pal: { Y: "#e3b04b", W: "#fff3c4" }
+    },
+    sparkle: {
+      rows: [
+        "...P...",
+        "...P...",
+        "..PWP..",
+        "PPWWWPP",
+        "..PWP..",
+        "...P...",
+        "...P..."
+      ],
+      pal: { P: "#c2456b", W: "#ffd6e3" }
+    },
+    note: {
+      rows: [
+        "..KKKKK",
+        "..K...K",
+        "..K...K",
+        "..K...K",
+        "KKK.KKK",
+        "KKK.KKK"
+      ],
+      pal: { K: "#242322" }
+    }
+  };
+
+  function icon(name, opts) {
+    opts = opts || {};
+    var art = ICONS[name] || ICONS.heart;
+    var scale = opts.scale || 3;
+    var w = art.rows[0].length, h = art.rows.length;
+    var wrap = el("span", "px-icon px-icon--" + name);
+    var cv = makeCanvas(w, h, scale, "px-canvas");
+    var ctx = cv.getContext("2d"), k = cv._k;
+    art.rows.forEach(function (row, y) {
+      for (var x = 0; x < w; x++) {
+        var c = art.pal[row[x]];
+        if (c) { ctx.fillStyle = c; ctx.fillRect(x * k, y * k, k, k); }
+      }
+    });
+    wrap.appendChild(cv);
+    wrap.setAttribute("aria-hidden", "true");
+    return { el: wrap };
+  }
+
+  /* ───────── efectos de sonido 8-bit ───────── */
+  var SFX = {
+    coin: [[988, 0.07, "square"], [1319, 0.2, "square"]],
+    error: [[220, 0.1, "square"], [165, 0.2, "square"]],
+    page: [[520, 0.03, "triangle"], [780, 0.03, "triangle"], [1040, 0.05, "triangle"]],
+    power: [[523, 0.07, "square"], [659, 0.07, "square"], [784, 0.07, "square"], [1047, 0.25, "square"]]
+  };
+  function sfx(name) {
+    if (!actx || actx.state !== "running" || !SFX[name]) return;
+    try {
+      var t = actx.currentTime;
+      SFX[name].forEach(function (n) {
+        var o = actx.createOscillator(), g = actx.createGain();
+        o.type = n[2];
+        o.frequency.setValueAtTime(n[0], t);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.045, t + 0.006);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + n[1]);
+        o.connect(g); g.connect(master);
+        o.start(t); o.stop(t + n[1] + 0.02);
+        t += n[1] * 0.85;
+      });
+    } catch (e) { /* nada */ }
+  }
+
   window.Pixel = {
     unlockAudio: unlockAudio,
     sprite: sprite,
     heart: heart,
+    icon: icon,
+    sfx: sfx,
     dialog: dialog,
     bubble: bubble,
     blip: function (who) { blip(ART[who] ? who : "tobi"); },

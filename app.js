@@ -34,7 +34,7 @@ const store = {
 
 // { gift, key, revealed, answered, page } — se guarda en la sesión para sobrevivir a una recarga
 let state = null;
-const save = (patch) => { Object.assign(state, patch); store.set(state); };
+const save = (patch) => { Object.assign(state, patch); store.set(state); hud.refresh(); };
 
 /* ───────── Cifrado (espejo de scripts/encrypt.mjs) ───────── */
 
@@ -104,8 +104,8 @@ const book = { pages: [], index: 0, busy: false };
 
 function makePage(cls, label) {
   const body = el("div", { class: "page__body" });
-  const prev = el("button", { class: "page__turn page__turn--prev", type: "button", text: "‹ Volver" });
-  const next = el("button", { class: "page__turn page__turn--next", type: "button", text: "Seguir ›" });
+  const prev = el("button", { class: "page__turn page__turn--prev", type: "button", text: "◀ ATRÁS" });
+  const next = el("button", { class: "page__turn page__turn--next", type: "button", text: "SIGUIENTE ▶" });
   const num = el("span", { class: "page__num" });
   // esquina doblada: se levanta sola cuando se puede pasar de hoja
   const corner = el("button", { class: "page__corner is-off", type: "button", "aria-label": "Pasar la hoja" });
@@ -120,7 +120,7 @@ function makePage(cls, label) {
 function refreshNav() {
   const last = book.pages.length - 1;
   book.pages.forEach((p, i) => {
-    p.num.textContent = String(i + 1);
+    p.num.textContent = `${i + 1}/${last + 1}`;
     p.prev.classList.toggle("is-off", i === 0);
     const blocked = i === last || !p.ready;
     p.next.classList.toggle("is-off", blocked);
@@ -159,7 +159,7 @@ function fitBook() {
   if (typing()) return keepFieldVisible(); // el teclado no achica el cuaderno
   const W = 430;
   const H = 620;
-  const reserve = document.documentElement.classList.contains("has-buddy") ? 92 : 0; // franja para el personajito
+  const reserve = document.documentElement.classList.contains("has-buddy") ? 92 + 40 : 0; // franjas para el personajito y el HUD
   fitScale = Math.min((innerWidth - 20) / W, (innerHeight - 28 - reserve) / H, 1.25);
   $("#fit").style.setProperty("--fit", fitScale.toFixed(4));
 }
@@ -227,7 +227,7 @@ async function turnTo(target, { from } = {}) {
   book.busy = true;
   cull(Math.min(book.index, target));
   setCurrent(target);
-  paperSound.play();
+  window.Pixel ? window.Pixel.sfx("page") : paperSound.play();
   vibrate(8);
   const page = forward ? pages[book.index].el : pages[target].el;
   const start = from ?? (forward ? 0 : 1);
@@ -236,6 +236,7 @@ async function turnTo(target, { from } = {}) {
   await animateTurn(page, start, end, ms, from == null);
   book.index = target;
   cull(target);
+  hud.refresh();
   book.busy = false;
   save({ page: target });
   pages[target].onEnter?.();
@@ -514,6 +515,7 @@ function initLock() {
 
     tilesBox.classList.add("is-ok");
     buddy.say("¡Esa era! Vamos.", "happy");
+    window.Pixel?.sfx("power");
     msg.textContent = "";
     input.blur();
     vibrate(30);
@@ -523,12 +525,13 @@ function initLock() {
     const pages = buildBook(state.gift, false);
     await sleep(900); // deja ver la ola de letras
     setCurrent(0);
-    paperSound.play();
+    window.Pixel ? window.Pixel.sfx("page") : paperSound.play();
     await turnAway($("#page-lock"));
     pages[0].onEnter();
   });
 
   function fail(text, clear) {
+    window.Pixel?.sfx("error");
     msg.textContent = text;
     tilesBox.classList.remove("is-error");
     void tilesBox.offsetWidth; // reinicia la animación
@@ -566,6 +569,15 @@ function writeLine(box, text, instant) {
   }
   p.append(el("span", { class: "sr-only", text }), visual);
   box.append(p);
+  // un "blip" por letra, como el texto de un videojuego (se corta si la completa tocando)
+  if (!instant && !reduceMotion && window.Pixel) {
+    const timers = [...text].map((ch, k) => (/s/.test(ch) ? 0 : setTimeout(() => window.Pixel.blip("tobi"), k * STEP)));
+    new MutationObserver((_, obs) => {
+      if (!p.classList.contains("is-instant")) return;
+      timers.forEach(clearTimeout);
+      obs.disconnect();
+    }).observe(p, { attributes: true, attributeFilter: ["class"] });
+  }
   return { p, duration: reduceMotion || instant ? 0 : i * STEP + 450 };
 }
 
@@ -579,24 +591,12 @@ function stick(frame, cls, tilt, i = 0) {
   return el("div", { class: `stuck ${cls}` }, frame);
 }
 
-// Dibujitos a mano (birome rosa) que se dibujan solos la primera vez que se llega a la hoja
-const DOODLES = {
-  heart: "M12 20.5C9 18 3.5 14 3.5 9.2 3.5 6.4 5.6 4.5 8 4.5c1.7 0 3.1 1 4 2.4.9-1.4 2.3-2.4 4-2.4 2.4 0 4.5 1.9 4.5 4.7 0 4.8-5.5 8.8-8.5 11.3z",
-  star: "M12 3.2l2.5 5.6 6 .6-4.5 4 1.3 5.9L12 16.3l-5.3 3 1.3-5.9-4.5-4 6-.6z",
-  sparkle: "M12 2.5c.6 4.6 2.9 6.9 7.5 7.5-4.6.6-6.9 2.9-7.5 7.5-.6-4.6-2.9-6.9-7.5-7.5 4.6-.6 6.9-2.9 7.5-7.5z",
-  swirl: "M3 16c3-7 9-9 12-6s-1 7-4 5 1-9 10-8",
-  arrow: "M3 6c5 1 10 5 13 12M16 18l-1-5M16 18l-5-1",
-};
+// Iconitos en pixel art (corazón, estrella, chispita, nota) que aparecen la primera vez que se llega a la hoja
 function doodle(kind, cls) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("class", `doodle ${cls}`);
-  svg.setAttribute("aria-hidden", "true");
-  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  path.setAttribute("d", DOODLES[kind]);
-  path.setAttribute("pathLength", "100");
-  svg.append(path);
-  return svg;
+  const ICON = { heart: "heart", star: "star", sparkle: "sparkle", swirl: "note", arrow: "sparkle" };
+  const node = window.Pixel?.icon(ICON[kind] ?? "sparkle", { scale: 3 }).el ?? el("span");
+  node.classList.add("doodle", ...cls.split(" "));
+  return node;
 }
 
 function letterPage(gift, frames, restoring) {
@@ -715,6 +715,7 @@ function ticketPage(gift, frames) {
     vibrate([40, 30, 90]);
     save({ revealed: true });
     buddy.say("¡SORPRESA!", "love");
+    window.Pixel?.sfx("power");
     setTimeout(() => setReady(page), 900);
   };
   // la lámina se pinta ya, con la hoja todavía tapada: nunca se ve la entrada antes de tiempo
@@ -749,36 +750,23 @@ async function setupScratch(canvas, onDone) {
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.scale(dpr, dpr);
 
-  // lámina dorada
-  const g = ctx.createLinearGradient(0, 0, w, h);
-  g.addColorStop(0, "#b48c3c");
-  g.addColorStop(.28, "#ead199");
-  g.addColorStop(.52, "#c49b4b");
-  g.addColorStop(.78, "#f0dcaa");
-  g.addColorStop(1, "#a88130");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = "rgba(110, 78, 25, .1)";
-  ctx.lineWidth = 1;
-  for (let x = -h; x < w; x += 6) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x + h, h);
-    ctx.stroke();
-  }
-  for (let i = 0; i < (w * h) / 60; i++) {
-    ctx.fillStyle = Math.random() < .5 ? `rgba(255,255,255,${Math.random() * .35})` : `rgba(90,60,15,${Math.random() * .18})`;
-    ctx.fillRect(Math.random() * w, Math.random() * h, 1.2, 1.2);
+  // lámina dorada pixelada (cuadritos de 6 px en dos tonos)
+  const P = 6;
+  for (let y = 0; y < h; y += P) {
+    for (let x = 0; x < w; x += P) {
+      const shade = ((x / P + y / P) % 2) ? "#d9b25c" : "#c99a45";
+      ctx.fillStyle = Math.random() < .06 ? "#f3dc9a" : shade;
+      ctx.fillRect(x, y, P, P);
+    }
   }
   ctx.textAlign = "center";
-  ctx.fillStyle = "rgba(74, 50, 14, .82)";
-  ctx.font = `italic 600 ${Math.round(Math.min(w / 7, 46))}px "Cormorant Garamond", Garamond, Georgia, serif`;
-  ctx.fillText("Rascá acá", w / 2, h / 2 + 4);
-  ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`;
-  ctx.fillStyle = "rgba(74, 50, 14, .6)";
-  ctx.fillText("C O N   E L   D E D O", w / 2, h / 2 + 30);
-  ctx.font = `400 18px Georgia, serif`;
-  ctx.fillText("✦", w / 2, h / 2 - 34);
+  ctx.fillStyle = "#3b2610";
+  ctx.font = `700 ${Math.round(Math.min(w / 9, 32))}px "Pixelify Sans", "VT323", monospace`;
+  ctx.fillText("RASCÁ ACÁ", w / 2, h / 2 + 6);
+  ctx.font = `400 14px "Pixelify Sans", "VT323", monospace`;
+  ctx.fillStyle = "rgba(59, 38, 16, .75)";
+  ctx.fillText("con el dedo", w / 2, h / 2 + 30);
+  ctx.fillText("★", w / 2, h / 2 - 28);
 
   ctx.globalCompositeOperation = "destination-out";
   ctx.strokeStyle = "#000"; // opaco: borra la lámina del todo
@@ -1061,7 +1049,9 @@ function numberPage(gift, frames = []) {
   const code = normalizePassword(String(cfg.codigo)).replace(/[^A-Z0-9]/g, "");
   // la lata en 3D: flota, la etiqueta gira; al tocarla da una vuelta rápida y salta
   const box = el("button", { class: "can", type: "button", "aria-label": "La lata" },
-    el("span", { class: "can__glow" }), el("span", { class: "can__body" }), el("span", { class: "can__lid" }));
+    el("span", { class: "can__glow" }),
+    el("span", { class: "can__body" }, window.Pixel?.icon("canBody", { scale: 7 }).el ?? null),
+    el("span", { class: "can__lid" }, window.Pixel?.icon("canLid", { scale: 7 }).el ?? null));
   // la lata va flanqueada por dos fotos y unas chispitas dibujadas
   const canWrap = el("div", { class: "can-wrap" },
     stick(frames[0], "stuck--flank-l", -9, 0),
@@ -1109,6 +1099,7 @@ function numberPage(gift, frames = []) {
       field.input.blur();
       save({ numero: true });
       buddy.say("¡Bien! Pero todavía no terminó…", "happy");
+      window.Pixel?.sfx("coin");
       solved();
       const r = box.getBoundingClientRect();
       confetti.burst(r.left + r.width / 2, r.top, 140);
@@ -1117,6 +1108,7 @@ function numberPage(gift, frames = []) {
       return;
     }
     msg.textContent = NOPE[tries++ % NOPE.length];
+    window.Pixel?.sfx("error");
     if (tries === 2) buddy.say("¿Revisaste bien debajo de las latas?");
     field.tilesBox.classList.remove("is-error");
     void field.tilesBox.offsetWidth;
@@ -1134,7 +1126,8 @@ function detailPage(gift, photos) {
   const page = makePage("page--detail", "Todavía no");
   const cfg = gift.detalle;
   const img = el("img", { class: "detail__img", alt: "", decoding: "async" });
-  const heart = el("button", { class: "detail__heart", type: "button", "aria-label": "Algo escondido" }, el("span", { text: "♥" }));
+  const heart = el("button", { class: "detail__heart", type: "button", "aria-label": "Algo escondido" },
+    el("span", {}, window.Pixel?.icon("heart", { scale: 2 }).el ?? "♥"));
   heart.style.left = `${cfg.x}%`;
   heart.style.top = `${cfg.y}%`;
   const photo = el("div", { class: "detail__photo is-loading" }, img, heart);
@@ -1191,6 +1184,7 @@ function detailPage(gift, photos) {
   heart.addEventListener("click", () => {
     save({ detalle: true });
     buddy.say("¡Lo encontraste!", "happy");
+    window.Pixel?.sfx("coin");
     found();
     const r = heart.getBoundingClientRect();
     confetti.burst(r.left + r.width / 2, r.top + r.height / 2, 150);
@@ -1231,6 +1225,7 @@ function guessPage(gift) {
     reply.classList.add("is-shown");
     vibrate(20);
     if (i === right && !state.adivinanza) {
+      window.Pixel?.sfx("coin");
       save({ adivinanza: true });
       setReady(page);
     }
@@ -1475,13 +1470,13 @@ const confetti = (() => {
   function piece(x, y, vx, vy) {
     return {
       x, y, vx, vy,
-      w: 6 + Math.random() * 6,
-      h: 9 + Math.random() * 9,
+      w: 6 + ((Math.random() * 3) | 0) * 3,
+      h: 0,
       rot: Math.random() * Math.PI,
       vrot: (Math.random() - .5) * .25,
       flip: Math.random() * Math.PI,
       color: COLORS[(Math.random() * COLORS.length) | 0],
-      round: Math.random() < .18,
+      round: false,
     };
   }
 
@@ -1501,15 +1496,13 @@ const confetti = (() => {
       p.flip += .14;
       ctx.save();
       ctx.translate(p.x, p.y);
-      ctx.rotate(p.rot);
-      ctx.scale(1, Math.cos(p.flip));
       ctx.fillStyle = p.color;
       if (p.round) {
         ctx.beginPath();
         ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2);
         ctx.fill();
       } else {
-        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.fillRect(Math.round(-p.w / 2), Math.round(-p.w / 2), p.w, p.w); // cuadradito: confeti de píxeles
       }
       ctx.restore();
     }
@@ -1585,7 +1578,7 @@ async function runScene(kind, lines) {
   scene.hidden = false;
   const sprite = window.Pixel?.sprite("tobi", { scale: 7 });
   sprite?.setMood("sleep"); // arranca dormido y se despierta al tocar "empezar"
-  const start = el("button", { class: "scene__start", type: "button", text: kind === "señuelo" ? "TOCÁ PARA CONTINUAR" : "TOCÁ PARA EMPEZAR" });
+  const start = el("button", { class: "scene__start", type: "button", text: { inicio: "▶ EMPEZAR JUEGO", señuelo: "▶ CONTINUAR", correcto: "▶ CONTINUAR" }[kind] });
   const dialogBox = el("div", { class: "scene__dialog" });
   const end = el("div", { class: "scene__end", hidden: true });
   scene.replaceChildren(el("div", { class: "scene__inner" },
@@ -1635,6 +1628,7 @@ const buddy = (() => {
       anchor = el("div", { class: "buddy" }, sprite.el);
       anchor.addEventListener("click", () => window.Pixel.blip("tobi"));
       document.body.append(anchor);
+      hud.show();
       fitBook();
     },
     say(text, mood = "normal") {
@@ -1644,6 +1638,31 @@ const buddy = (() => {
         .then(() => sprite?.setMood("normal"))
         .catch(() => {});
       return true;
+    },
+  };
+})();
+
+// HUD del juego: nivel (hoja actual) y un corazón por cada prueba superada
+const hud = (() => {
+  let box = null;
+  const PRUEBAS = [() => true, () => state?.numero, () => state?.detalle, () => state?.adivinanza, () => state?.revealed];
+  return {
+    show() {
+      if (box || !window.Pixel) return;
+      box = el("div", { class: "hud", "aria-hidden": "true" });
+      document.body.append(box);
+      this.refresh();
+    },
+    refresh() {
+      if (!box) return;
+      const hearts = PRUEBAS.map((ok) => {
+        const icon = window.Pixel.icon("heart", { scale: 3 }).el;
+        if (!ok()) icon.classList.add("is-empty");
+        return icon;
+      });
+      box.replaceChildren(
+        el("span", { class: "hud__lvl", text: `NIVEL ${book.index + 1}` }),
+        el("span", { class: "hud__hearts" }, hearts));
     },
   };
 })();
