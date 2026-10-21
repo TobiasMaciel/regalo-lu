@@ -1015,7 +1015,7 @@ function numberPage(gift, frames = []) {
     }
     msg.textContent = NOPE[tries++ % NOPE.length];
     window.Pixel?.sfx("error");
-    if (tries === 2) buddy.say("¿Revisaste bien debajo de las latas?");
+    if (tries === 2) buddy.say("Buscá bien en lo que te di… dalo vuelta.");
     field.tilesBox.classList.remove("is-error");
     void field.tilesBox.offsetWidth;
     field.tilesBox.classList.add("is-error");
