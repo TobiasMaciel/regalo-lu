@@ -641,6 +641,49 @@
 
   /* ───────── íconos en pixel art (modo juego) ───────── */
   var ICONS = {
+    // la piñata (burrito de colores) y el regalo que cae (tapa y caja por separado)
+    pinata: {
+      rows: [
+        "...oo...................",
+        "..oPPo..................",
+        "..oPPo..................",
+        ".oYYYYoo................",
+        "oYYkYYYYo...............",
+        "oYYYYYYYYoooooooooooooo.",
+        ".ooYYYYYCCCCCCCCCCCCCCCo",
+        "...oPPPPPPPPPPPPPPPPPPPo",
+        "...oYYYYYYYYYYYYYYYYYYYo",
+        "...oGGGGGGGGGGGGGGGGGGGo",
+        "...oCCCCCCCCCCCCCCCCCCCo",
+        "...ooooooooooooooooooooo",
+        "....oPo.oPo.....oPo.oPo.",
+        "....oPo.oPo.....oPo.oPo.",
+        "....ooo.ooo.....ooo.ooo."
+      ],
+      pal: { o: "#242322", P: "#e0548c", Y: "#f2c94c", C: "#5ec8e5", G: "#7bd389", k: "#242322" }
+    },
+    giftLid: {
+      rows: [
+        "....oo..oo....",
+        "...oYYooYYo...",
+        "....oYYYYo....",
+        "oooooooooooooo",
+        "oPPPPPYYPPPPPo",
+        "oPPPPPYYPPPPPo",
+        "oooooooooooooo"
+      ],
+      pal: { o: "#242322", P: "#e0548c", Y: "#f2c94c" }
+    },
+    giftBase: {
+      rows: [
+        ".oPPPPYYPPPPo.",
+        ".oPPPPYYPPPPo.",
+        ".oPPPPYYPPPPo.",
+        ".oPPPPYYPPPPo.",
+        ".oooooooooooo."
+      ],
+      pal: { o: "#242322", P: "#c2456b", Y: "#f2c94c" }
+    },
     // pistas de la búsqueda de palabras: la compu, el baño y Snoopy
     laptop: {
       rows: [
@@ -807,7 +850,8 @@
     coin: [[988, 0.07, "square"], [1319, 0.2, "square"]],
     error: [[220, 0.1, "square"], [165, 0.2, "square"]],
     page: [[520, 0.03, "triangle"], [780, 0.03, "triangle"], [1040, 0.05, "triangle"]],
-    power: [[523, 0.07, "square"], [659, 0.07, "square"], [784, 0.07, "square"], [1047, 0.25, "square"]]
+    power: [[523, 0.07, "square"], [659, 0.07, "square"], [784, 0.07, "square"], [1047, 0.25, "square"]],
+    hit: [[150, 0.05, "square"], [95, 0.09, "square"]]
   };
   function sfx(name) {
     if (!actx || actx.state !== "running" || !SFX[name]) return;

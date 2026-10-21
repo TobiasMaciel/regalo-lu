@@ -1086,12 +1086,19 @@ body::after {
 @keyframes twinkle { 0%, 88%, 100% { transform: rotate(-14deg) scale(1); } 94% { transform: rotate(-14deg) scale(1.18); filter: brightness(1.12); } }
 @keyframes heart-hint { 50% { transform: rotate(-14deg) scale(1.6); opacity: 1; } }
 .detail__heart.is-found span {
-  animation: none;
+  animation: px-pop .4s steps(3);
   opacity: 1;
-  color: var(--pen);
-  transform: rotate(0) scale(3.2);
-  text-shadow: 0 2px 8px rgba(255, 255, 255, .9);
+  transform: rotate(0) scale(1.25);
 }
+.detail__heart.is-found::after { /* recuadro pixel que se cierra sobre el corazón */
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 3px solid var(--pen);
+  box-shadow: 0 0 0 2px #fff;
+  animation: found-ring .5s steps(4) both;
+}
+@keyframes found-ring { from { transform: scale(2.4); opacity: 0; } }
 .detail__miss { /* marquita donde tocó y no era */
   position: absolute;
   width: 26px;
@@ -1782,6 +1789,62 @@ body::before {
 .page--word { align-items: center; justify-content: center; text-align: center; padding-bottom: 34px; }
 .word__icon { margin: 26px 0 30px; line-height: 0; animation: can-bob 1.4s steps(2) infinite; }
 .word__icon.is-done { animation: px-pop .5s steps(4); }
+
+/* la piñata */
+.page--pinata .page__body { align-items: center; justify-content: center; text-align: center; }
+.pinata-stage { position: relative; width: 100%; height: 230px; margin: 4px 0 14px; }
+.pinata {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 144px;
+  margin-left: -72px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transform-origin: 50% 0;
+  animation: swing 2.4s ease-in-out infinite;
+  touch-action: manipulation;
+}
+.pinata__rope { display: block; width: 3px; height: 70px; margin: 0 auto; background: #8b6342; box-shadow: 1px 0 0 #6e4b30; }
+.pinata__body { display: block; line-height: 0; }
+@keyframes swing { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+.pinata.is-hit { animation: hit-swing .5s steps(5), swing 2.4s .5s ease-in-out infinite; }
+@keyframes hit-swing {
+  20% { transform: rotate(-22deg) scale(.95, 1.05); }
+  50% { transform: rotate(16deg); }
+  80% { transform: rotate(-6deg); }
+}
+.pinata.is-broken { animation: pop-out .4s steps(4) forwards; }
+@keyframes pop-out { to { transform: scale(1.6); opacity: 0; } }
+.gift-drop {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  width: 98px;
+  margin-left: -49px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  line-height: 0;
+}
+.gift-drop__lid, .gift-drop__base { display: block; transition: transform .4s steps(4); }
+.gift-drop__tap {
+  display: block;
+  margin-top: 10px;
+  font: 600 13px/1 var(--serif);
+  letter-spacing: .12em;
+  color: var(--pen);
+  animation: blink-text 1s steps(1) infinite;
+}
+.gift-drop.is-falling { animation: drop .7s cubic-bezier(.5, 0, .7, .4) both, wiggle 1.6s .9s steps(4) infinite; }
+@keyframes drop { from { transform: translateY(-190px); } 80% { transform: translateY(6px); } }
+@keyframes wiggle { 0%, 70%, 100% { transform: none; } 80% { transform: rotate(-6deg); } 90% { transform: rotate(6deg); } }
+.gift-drop.is-open { animation: none; }
+.gift-drop.is-open .gift-drop__lid { transform: translate(18px, -46px) rotate(18deg); }
+.gift-drop.is-open .gift-drop__tap { visibility: hidden; }
 
 /* ───────── En el celular: sin efectos pesados (evita parpadeos) ───────── */
 @media (hover: none) {

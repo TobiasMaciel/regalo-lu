@@ -400,7 +400,7 @@ function buildBook(gift, restoring) {
     gift.adivinaCancion?.rondas?.length ? songPage(gift) : null,
     gift.adivinanza ? guessPage(gift) : null,
     gift.nota ? notePage(gift) : null,
-    shakePage(gift),
+    pinataPage(gift),
     ticketPage(gift, ticketFrames),
     questionPage(gift, questionFrames),
     setlistPage(gift, setlistFrames),
@@ -1492,6 +1492,110 @@ function songPage(gift) {
   });
   page.onEnter = () => buddy.say("¡Subí el volumen!");
   show();
+  return page;
+}
+
+/* ───────── Nivel: la piñata ───────── */
+
+// Golpear la piñata (tocándola; si el celular tiene sensor, sacudirlo también cuenta) hasta que se rompe,
+// cae un regalo y, al tocarlo, se abre y pasa a la entrada para raspar.
+function pinataPage(gift) {
+  const page = makePage("page--pinata", "La piñata");
+  page.key = "pinata";
+  const HITS = 9;
+  const pinata = el("button", { class: "pinata", type: "button", "aria-label": "Pegale a la piñata" },
+    el("span", { class: "pinata__rope" }),
+    el("span", { class: "pinata__body" }, window.Pixel?.icon("pinata", { scale: 6 }).el ?? null));
+  const present = el("button", { class: "gift-drop", type: "button", "aria-label": "Tu regalo", hidden: true },
+    el("span", { class: "gift-drop__lid" }, window.Pixel?.icon("giftLid", { scale: 7 }).el ?? null),
+    el("span", { class: "gift-drop__base" }, window.Pixel?.icon("giftBase", { scale: 7 }).el ?? null),
+    el("span", { class: "gift-drop__tap", text: "TOCALO" }));
+  const stage = el("div", { class: "pinata-stage" }, pinata, present);
+  const bar = el("span", { class: "shake__fill" });
+  const title = el("h2", { class: "number__title", text: "¡Pegale a la piñata!" });
+  const text = el("p", { class: "number__text", text: "Tocala fuerte. No se rompe tan fácil…" });
+  page.body.append(title, text, stage, el("div", { class: "shake__bar" }, bar));
+  page.el.append(doodle("star", "doodle--shake"), doodle("sparkle", "doodle--shake-b"));
+
+  const opened = () => {
+    pinata.hidden = true;
+    present.hidden = false;
+    present.classList.add("is-open");
+    bar.style.width = "100%";
+    title.textContent = "¡Tu regalo!";
+    text.textContent = "Pasá la hoja.";
+  };
+  if (state.pinata) {
+    opened();
+    return page;
+  }
+  page.ready = false;
+
+  let hits = 0;
+  let last = 0;
+  const hit = () => {
+    if (hits >= HITS) return;
+    hits++;
+    bar.style.width = `${(hits / HITS) * 100}%`;
+    pinata.classList.remove("is-hit");
+    void pinata.offsetWidth;
+    pinata.classList.add("is-hit");
+    window.Pixel?.sfx("hit");
+    vibrate(20);
+    const r = pinata.getBoundingClientRect();
+    confetti.burst(r.left + r.width / 2, r.top + r.height * .65, 10); // caramelitos que saltan
+    if (hits === 3) buddy.say("¡Más fuerte!");
+    if (hits === 6) buddy.say("¡Ya casi!");
+    if (hits < HITS) return;
+    // se rompe: explota y cae el regalo
+    removeEventListener("devicemotion", onMotion);
+    setTimeout(() => {
+      window.Pixel?.sfx("power");
+      confetti.burst(r.left + r.width / 2, r.top + r.height / 2, 200);
+      pinata.classList.add("is-broken");
+      setTimeout(() => {
+        pinata.hidden = true;
+        present.hidden = false;
+        present.classList.add("is-falling");
+        window.Pixel?.sfx("hit");
+        title.textContent = "¿Y eso?";
+        text.textContent = "";
+        buddy.say("¿Qué es eso que cayó?", "surprised", 2200);
+        setTimeout(() => buddy.say("¡Ah! Es tu regalo.", "love", 3500), 2600);
+      }, 450);
+    }, 250);
+  };
+  pinata.addEventListener("click", hit);
+  // si el celular tiene sensor (y no pide permiso), sacudirlo también le pega
+  const onMotion = (e) => {
+    const a = e.accelerationIncludingGravity || e.acceleration;
+    if (!a) return;
+    const now = performance.now();
+    if (Math.abs(a.x || 0) + Math.abs(a.y || 0) + Math.abs(a.z || 0) > 34 && now - last > 350) {
+      last = now;
+      hit();
+    }
+  };
+  present.addEventListener("click", async () => {
+    if (state.pinata) return;
+    save({ pinata: true });
+    present.classList.remove("is-falling");
+    present.classList.add("is-open");
+    window.Pixel?.sfx("coin");
+    const r = present.getBoundingClientRect();
+    confetti.burst(r.left + r.width / 2, r.top, 160);
+    vibrate([30, 40, 90]);
+    title.textContent = "¡Tu regalo!";
+    setReady(page);
+    await sleep(1300);
+    turnTo(book.index + 1); // y aparece la entrada para raspar
+  });
+  page.onEnter = () => {
+    buddy.say("¡Pegale a la piñata!", "happy");
+    if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission !== "function") {
+      addEventListener("devicemotion", onMotion);
+    }
+  };
   return page;
 }
 
