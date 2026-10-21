@@ -1310,6 +1310,100 @@ body::after {
 .page--note.is-signed .note__sign { opacity: 1; transform: none; }
 .doodle--note { right: 40px; bottom: 120px; width: 40px; height: 40px; transform: rotate(10deg); }
 
+/* ───────── Pantalla retro del personajito (inicio, señuelos, bienvenida) ───────── */
+.is-scene .stage { visibility: hidden; }
+.is-scene .book { animation: none; } /* entra recién cuando termina la escena */
+.scene {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  /* grilla de píxeles muy suave sobre el fondo del sitio */
+  background:
+    linear-gradient(rgba(36, 35, 34, .035) 1px, transparent 1px) 0 0 / 8px 8px,
+    linear-gradient(90deg, rgba(36, 35, 34, .035) 1px, transparent 1px) 0 0 / 8px 8px;
+  animation: fade-in .5s var(--ease-out);
+}
+.scene.is-leaving { animation: scene-out .7s ease-in forwards; }
+@keyframes scene-out { to { opacity: 0; transform: scale(1.04); } }
+.scene__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: min(100%, 440px);
+}
+.scene__title {
+  margin: 0;
+  font: 400 34px/1 "Pixelify Sans", "VT323", monospace;
+  letter-spacing: .08em;
+  color: var(--pen);
+  text-shadow: 3px 3px 0 #242322;
+}
+.scene__sprite {
+  min-height: 150px;
+  display: grid;
+  place-items: end center;
+  animation: sprite-in .8s .2s var(--ease-spring) both;
+}
+@keyframes sprite-in { from { opacity: 0; transform: translateY(30px) scale(.8); } }
+.scene__start {
+  appearance: none;
+  margin-top: 8px;
+  padding: 14px 22px;
+  border: 0;
+  background: #242322;
+  box-shadow: 0 0 0 3px #ebe5d8, 0 0 0 6px #242322, 6px 6px 0 6px rgba(36, 35, 34, .25);
+  font: 400 18px/1 "Pixelify Sans", "VT323", monospace;
+  letter-spacing: .1em;
+  color: #ebe5d8;
+  cursor: pointer;
+  animation: blink-text 1.1s steps(1) infinite;
+}
+@keyframes blink-text { 50% { color: #c99a45; } }
+.scene__dialog { width: 100%; }
+.scene__end {
+  display: grid;
+  gap: 6px;
+  text-align: center;
+  font-family: "Pixelify Sans", "VT323", monospace;
+  animation: fade-in .6s var(--ease-out);
+}
+.scene__end strong {
+  font-size: 30px;
+  font-weight: 400;
+  letter-spacing: .12em;
+  color: var(--pen);
+  text-shadow: 2px 2px 0 #242322;
+  animation: blink-text 1.2s steps(1) infinite;
+}
+.scene__end span { font-size: 18px; color: var(--ink-soft); }
+
+/* ───────── El personajito que acompaña abajo del cuaderno ───────── */
+.has-buddy .stage { padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+.buddy {
+  position: fixed;
+  z-index: 40;
+  left: max(14px, calc(50% - 205px));
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  cursor: pointer;
+  animation: buddy-in .8s var(--ease-spring) both;
+}
+@keyframes buddy-in { from { opacity: 0; transform: translateY(40px); } }
+
+/* ───────── Final: los dos personajitos con un corazón en el medio ───────── */
+.duo {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.page.is-current:not(.is-seen) .duo { animation: rise-in 1s 1.2s var(--ease-out) both; }
+.page--final .stuck--final { width: min(46%, 180px); margin-bottom: 18px; }
+
 /* ───────── En el celular: sin efectos pesados (evita parpadeos) ───────── */
 @media (hover: none) {
   /* el cuaderno solo se escala: sin perspectiva permanente (en Safari hace parpadear las hojas) */

@@ -96,7 +96,7 @@ await writeFile(root("adelanto.js"), `window.ADELANTO = ${JSON.stringify(teaser)
 
 // index.html pide cada archivo con su versión (?v=…)
 let html = await readFile(root("index.html"), "utf8");
-for (const name of ["styles.css", "app.js", "gift.enc.js", "adelanto.js"]) {
+for (const name of ["styles.css", "pixel.css", "app.js", "pixel.js", "gift.enc.js", "adelanto.js"]) {
   const v = version(await readFile(root(name), "utf8"));
   const escaped = name.replace(/\./g, "\\.");
   html = html.replace(new RegExp(`${escaped}(\\?v=[0-9a-f]+)?"`, "g"), `${name}?v=${v}"`);

@@ -159,7 +159,8 @@ function fitBook() {
   if (typing()) return keepFieldVisible(); // el teclado no achica el cuaderno
   const W = 430;
   const H = 620;
-  fitScale = Math.min((innerWidth - 20) / W, (innerHeight - 28) / H, 1.25);
+  const reserve = document.documentElement.classList.contains("has-buddy") ? 92 : 0; // franja para el personajito
+  fitScale = Math.min((innerWidth - 20) / W, (innerHeight - 28 - reserve) / H, 1.25);
   $("#fit").style.setProperty("--fit", fitScale.toFixed(4));
 }
 
@@ -503,6 +504,7 @@ function initLock() {
         fail("No se pudo cargar. Probá de nuevo en un rato.", false);
       } else {
         fail(NOPE[attempts++ % NOPE.length], true);
+        if (attempts === 3) buddy.say("Pista: fijate en las letras rojas de la carta.");
       }
       submit.textContent = "Abrir";
       busy = false;
@@ -511,6 +513,7 @@ function initLock() {
     }
 
     tilesBox.classList.add("is-ok");
+    buddy.say("¡Esa era! Vamos.", "happy");
     msg.textContent = "";
     input.blur();
     vibrate(30);
@@ -711,6 +714,7 @@ function ticketPage(gift, frames) {
     setTimeout(() => confetti.rain(90), 350);
     vibrate([40, 30, 90]);
     save({ revealed: true });
+    buddy.say("¡SORPRESA!", "love");
     setTimeout(() => setReady(page), 900);
   };
   // la lámina se pinta ya, con la hoja todavía tapada: nunca se ve la entrada antes de tiempo
@@ -1104,6 +1108,7 @@ function numberPage(gift, frames = []) {
     if (v === code) {
       field.input.blur();
       save({ numero: true });
+      buddy.say("¡Bien! Pero todavía no terminó…", "happy");
       solved();
       const r = box.getBoundingClientRect();
       confetti.burst(r.left + r.width / 2, r.top, 140);
@@ -1112,6 +1117,7 @@ function numberPage(gift, frames = []) {
       return;
     }
     msg.textContent = NOPE[tries++ % NOPE.length];
+    if (tries === 2) buddy.say("¿Revisaste bien debajo de las latas?");
     field.tilesBox.classList.remove("is-error");
     void field.tilesBox.offsetWidth;
     field.tilesBox.classList.add("is-error");
@@ -1179,9 +1185,12 @@ function detailPage(gift, photos) {
     setTimeout(() => mark.remove(), 700);
     vibrate(25);
     if (++misses >= 4) heart.classList.add("is-hinting");
+    if (misses === 6) buddy.say("Está entre las flores…");
   });
+  page.onEnter = () => buddy.say("Mirá bien esta foto…");
   heart.addEventListener("click", () => {
     save({ detalle: true });
+    buddy.say("¡Lo encontraste!", "happy");
     found();
     const r = heart.getBoundingClientRect();
     confetti.burst(r.left + r.width / 2, r.top + r.height / 2, 150);
@@ -1218,7 +1227,7 @@ function guessPage(gift) {
     b.classList.add("is-picked");
     reply.classList.remove("is-shown");
     void reply.offsetWidth;
-    reply.textContent = cfg.opciones[i].respuesta;
+    reply.textContent = buddy.say(cfg.opciones[i].respuesta, i === right ? "happy" : "normal") ? "" : cfg.opciones[i].respuesta;
     reply.classList.add("is-shown");
     vibrate(20);
     if (i === right && !state.adivinanza) {
@@ -1309,6 +1318,13 @@ function finalPage(gift, frame) {
     el("p", { class: "closing", text: gift.final }),
     el("p", { class: "closing__sign", text: `— ${gift.firma}` }));
   page.el.append(doodle("heart", "doodle--final"), doodle("sparkle", "doodle--final-b"), doodle("star", "doodle--final-c"));
+  if (window.Pixel) {
+    const yo = window.Pixel.sprite("tobi", { scale: 3 });
+    const ella = window.Pixel.sprite("lu", { scale: 3 });
+    yo.setMood("love");
+    ella.setMood("love");
+    page.body.append(el("div", { class: "duo", "aria-hidden": "true" }, yo.el, window.Pixel.heart({ scale: 3 }).el, ella.el));
+  }
 
   // corazoncitos que suben mientras la última hoja está a la vista
   const HEARTS = ["#c2456b", "#e07a9a", "#f4b6c8", "#d81e1e"];
@@ -1324,6 +1340,7 @@ function finalPage(gift, frame) {
   };
   let timer = 0;
   page.onEnter = () => {
+    buddy.say("Feliz cumple, Lu.", "love");
     if (reduceMotion) return;
     for (let i = 0; i < 10; i++) setTimeout(spawn, i * 140);
     clearInterval(timer);
@@ -1525,6 +1542,110 @@ const confetti = (() => {
   };
 })();
 
+/* ───────── El personajito y la búsqueda de QRs ───────── */
+
+// Cada QR lleva a ?q=…: uno solo abre el cuaderno; los demás son señuelos. Sin ?q (el QR de la carta) es el inicio del juego.
+const QR_CORRECTO = "a4k9";
+const ESCENAS = {
+  inicio: [
+    "?¡Hola, Lu!",
+    "Soy yo… bueno, una versión mía en píxeles.",
+    "!Te tengo un regalo.",
+    "Pensaste que era solo una carta, ¿no?",
+    "Pero no te la voy a hacer tan fácil.",
+    "En algún lugar hay un código QR que te lleva a tu regalo.",
+    "Hay varios… pero uno solo es el correcto.",
+    "!¡Empecemos la búsqueda!",
+  ],
+  correcto: [
+    "?¡Eh! ¿Cómo llegaste hasta acá?",
+    "!Bueno… creo que estás en el lugar correcto.",
+    "Pero no te emociones: esto recién empieza.",
+    "Te preparé un cuaderno con algunas pruebas.",
+    "!Abrilo y vamos.",
+  ],
+  señuelos: {
+    m2x7: ["Mmm…", "?Creo que este no es.", "Seguí buscando."],
+    t8p3: ["!¡Ja! Caíste.", "Este QR no lleva a ningún lado.", "Probá con otro."],
+    w5r1: ["?¿Otra vez vos?", "Este tampoco es…", "Pista: no todas las latas son iguales."],
+  },
+  señueloGenerico: ["?Mmm… este no es.", "Seguí buscando."],
+};
+const FIN_ESCENA = {
+  inicio: ["MISIÓN", "Encontrá el QR correcto"],
+  señuelo: ["¿CONTINUAR?", "Escaneá otro QR"],
+};
+
+// Pantalla retro: "TOCÁ PARA EMPEZAR" (ese toque habilita el sonido) → el personajito habla → fin o cuaderno
+async function runScene(kind, lines) {
+  document.documentElement.classList.add("is-scene");
+  const scene = $("#scene");
+  scene.hidden = false;
+  const sprite = window.Pixel?.sprite("tobi", { scale: 7 });
+  sprite?.setMood("sleep"); // arranca dormido y se despierta al tocar "empezar"
+  const start = el("button", { class: "scene__start", type: "button", text: kind === "señuelo" ? "TOCÁ PARA CONTINUAR" : "TOCÁ PARA EMPEZAR" });
+  const dialogBox = el("div", { class: "scene__dialog" });
+  const end = el("div", { class: "scene__end", hidden: true });
+  scene.replaceChildren(el("div", { class: "scene__inner" },
+    el("p", { class: "scene__title", text: "PARA LU" }),
+    el("div", { class: "scene__sprite" }, sprite?.el ?? null),
+    start, dialogBox, end));
+
+  await new Promise((resolve) => start.addEventListener("click", resolve, { once: true }));
+  window.Pixel?.unlockAudio();
+  start.remove();
+  scene.classList.add("is-talking");
+  await sprite?.wake(); // va abriendo los ojos
+  if (window.Pixel) {
+    await window.Pixel.dialog(dialogBox, { who: "tobi", lines, name: "TOBI", sprite });
+  } else {
+    // sin el módulo de píxeles: las líneas de a una, tocando para seguir
+    for (const line of lines) {
+      dialogBox.textContent = line.replace(/^[!?]/, "");
+      await tapOn(dialogBox);
+    }
+  }
+  if (kind === "correcto") {
+    sprite?.setMood("happy");
+    scene.classList.add("is-leaving");
+    await sleep(700);
+    scene.hidden = true;
+    scene.replaceChildren();
+    sprite?.destroy();
+    document.documentElement.classList.remove("is-scene");
+    return;
+  }
+  const [title, sub] = FIN_ESCENA[kind];
+  end.append(el("strong", { text: title }), el("span", { text: sub }));
+  end.hidden = false;
+  sprite?.setMood(kind === "inicio" ? "happy" : "normal");
+}
+
+// El personajito acompaña chiquito abajo del cuaderno y comenta en los momentos clave
+const buddy = (() => {
+  let sprite = null;
+  let anchor = null;
+  return {
+    show() {
+      if (!window.Pixel || sprite) return;
+      document.documentElement.classList.add("has-buddy");
+      sprite = window.Pixel.sprite("tobi", { scale: 3 });
+      anchor = el("div", { class: "buddy" }, sprite.el);
+      anchor.addEventListener("click", () => window.Pixel.blip("tobi"));
+      document.body.append(anchor);
+      fitBook();
+    },
+    say(text, mood = "normal") {
+      if (!sprite) return false;
+      sprite.setMood(mood);
+      window.Pixel.bubble(anchor, text, { who: "tobi", duration: 3200 })
+        .then(() => sprite?.setMood("normal"))
+        .catch(() => {});
+      return true;
+    },
+  };
+})();
+
 /* ───────── Inicio ───────── */
 
 // el cuaderno aparece recién con las fuentes cargadas: nada de saltos ni letras que cambian
@@ -1532,10 +1653,15 @@ const ready = Promise.race([document.fonts.ready, sleep(2000)]).then(() => {
   document.documentElement.classList.remove("is-loading");
 });
 
+const q = new URLSearchParams(location.search).get("q");
 const saved = store.get();
-if (saved?.gift) {
+if (q !== QR_CORRECTO) {
+  // QR de la carta (sin ?q) o un señuelo: solo el personajito, el cuaderno no aparece
+  ready.then(() => (q ? runScene("señuelo", ESCENAS.señuelos[q] ?? ESCENAS.señueloGenerico) : runScene("inicio", ESCENAS.inicio)));
+} else if (saved?.gift) {
   // recarga: el cuaderno se rearma ya abierto en la hoja donde estaba
   state = saved;
+  buddy.show();
   $("#page-intro").classList.add("is-turned", "is-gone");
   $("#page-lock").classList.add("is-turned", "is-gone");
   const pages = buildBook(state.gift, true);
@@ -1556,7 +1682,7 @@ if (saved?.gift) {
     p.style.setProperty("--i", TEASE[i][1]);
     return p;
   }));
-  // al entrar se ve la carta; al segundo la hoja gira sola (o antes, si la toca)
+  // primero el personajito la recibe; después aparece el cuaderno con la carta, que gira sola al rato
   const intro = $("#page-intro");
   let turned = false;
   const turnIntro = () => {
@@ -1565,6 +1691,12 @@ if (saved?.gift) {
     turnAway(intro);
   };
   intro.addEventListener("click", turnIntro);
-  ready.then(() => sleep(1800)).then(turnIntro);
+  ready
+    .then(() => runScene("correcto", ESCENAS.correcto))
+    .then(() => {
+      buddy.show();
+      return sleep(2600);
+    })
+    .then(turnIntro);
 }
 })();
