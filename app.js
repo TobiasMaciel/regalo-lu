@@ -256,7 +256,7 @@ function nudgeLocked() {
 (() => {
   // se puede arrastrar desde cualquier lado (fotos y botones incluidos: si fue arrastre, el toque no cuenta),
   // salvo donde el dedo ya hace otra cosa: raspar, escribir o perseguir al "No"
-  const NO_DRAG = "input, .scratch, .btn--no, dialog";
+  const NO_DRAG = "input, .scratch, .btn--no, dialog, .runner-box";
   const clamp = (v) => Math.min(1, Math.max(0, v));
   let d = null;
   let draggedAt = -1e9; // el "click" que el navegador dispara al soltar un arrastre no debe contar como toque
@@ -392,15 +392,21 @@ function buildBook(gift, restoring) {
 
   const pages = [
     letterPage(gift, letterFrames, restoring),
+    runnerPage(gift),
     gift.numero?.codigo ? numberPage(gift, numberFrames) : null,
+    gift.misiones?.invisible ? missionPage(gift.misiones.invisible, "invisible") : null,
     gift.detalle ? detailPage(gift, photos) : null,
+    gift.misiones?.escondite ? missionPage(gift.misiones.escondite, "escondite") : null,
+    gift.adivinaCancion?.rondas?.length ? songPage(gift) : null,
     gift.adivinanza ? guessPage(gift) : null,
     gift.nota ? notePage(gift) : null,
+    shakePage(gift),
     ticketPage(gift, ticketFrames),
     questionPage(gift, questionFrames),
     setlistPage(gift, setlistFrames),
     ...collages.map((frames) => photoPage(frames)),
     finalPage(gift, finalFrame),
+    showPage(gift),
   ].filter(Boolean);
 
   // cada hoja nueva va debajo de la anterior (en el DOM, antes = más abajo)
@@ -505,7 +511,8 @@ function initLock() {
         fail("No se pudo cargar. Probá de nuevo en un rato.", false);
       } else {
         fail(NOPE[attempts++ % NOPE.length], true);
-        if (attempts === 3) buddy.say("Pista: fijate en las letras rojas de la carta.");
+        if (attempts === 2) buddy.say("Mirá bien la carta… hay letras que no son como las otras.");
+        if (attempts === 4) buddy.say("Fijate en las letras de otro color.");
       }
       submit.textContent = "Abrir";
       busy = false;
@@ -684,6 +691,7 @@ function buildTicket(gift) {
 
 function ticketPage(gift, frames) {
   const page = makePage("page--gift", "Tu regalo");
+  page.key = "revealed";
   const ticket = buildTicket(gift);
   const canvas = el("canvas", { class: "scratch", "aria-hidden": "true" });
   const wrap = el("div", { class: "ticket-wrap is-covered" }, ticket, canvas);
@@ -714,7 +722,7 @@ function ticketPage(gift, frames) {
     setTimeout(() => confetti.rain(90), 350);
     vibrate([40, 30, 90]);
     save({ revealed: true });
-    buddy.say("¡SORPRESA!", "love");
+    buddy.say("¿Querés ir a ver a Tan Biónica conmigo?", "love", 7000);
     window.Pixel?.sfx("power");
     setTimeout(() => setReady(page), 900);
   };
@@ -1045,6 +1053,7 @@ function codeField(len, numeric) {
 // Hoja "Te falta algo": el regalo todavía no; primero hay que encontrar un número
 function numberPage(gift, frames = []) {
   const page = makePage("page--number", "Te falta algo");
+  page.key = "numero";
   const cfg = gift.numero;
   const code = normalizePassword(String(cfg.codigo)).replace(/[^A-Z0-9]/g, "");
   // la lata en 3D: flota, la etiqueta gira; al tocarla da una vuelta rápida y salta
@@ -1124,6 +1133,7 @@ function numberPage(gift, frames = []) {
 // "Todavía no.": en una de las fotos hay un corazoncito camuflado; hay que encontrarlo y tocarlo
 function detailPage(gift, photos) {
   const page = makePage("page--detail", "Todavía no");
+  page.key = "detalle";
   const cfg = gift.detalle;
   const img = el("img", { class: "detail__img", alt: "", decoding: "async" });
   const heart = el("button", { class: "detail__heart", type: "button", "aria-label": "Algo escondido" },
@@ -1199,6 +1209,7 @@ function detailPage(gift, photos) {
 // Adivinanza en joda antes del regalo: cada opción boluda tiene su respuesta; la buena habilita seguir
 function guessPage(gift) {
   const page = makePage("page--guess", "¿Qué es?");
+  page.key = "adivinanza";
   const cfg = gift.adivinanza;
   const reply = el("p", { class: "guess__reply", "aria-live": "polite" });
   const buttons = cfg.opciones.map((o) => el("button", { class: "guess__opt", type: "button", text: o.texto }));
@@ -1267,6 +1278,304 @@ function notePage(gift) {
   return page;
 }
 
+/* ───────── Nivel: Lu en salchicha (runner tipo dinosaurio de Chrome) ───────── */
+
+// Ella arriba de un salchicha saltando obstáculos. No importa hasta dónde llegue: después del primer intento ya puede seguir.
+function runnerPage(gift) {
+  const page = makePage("page--runner", "Nivel salchicha");
+  page.key = "runner";
+  const cfg = gift.salchicha ?? {};
+  const box = el("div", { class: "runner-box" });
+  const score = el("p", { class: "number__ok runner__score", "aria-live": "polite" });
+  page.body.append(
+    el("h2", { class: "number__title", text: cfg.titulo ?? "¡A correr!" }),
+    el("p", { class: "number__text", text: cfg.texto ?? "Ayudá a Lu y al salchicha a llegar lo más lejos posible." }),
+    box, score);
+  page.el.append(doodle("star", "doodle--runner"));
+  if (!state.runner) page.ready = false;
+  if (state.runnerBest) score.textContent = `RÉCORD: ${state.runnerBest}`;
+
+  let game = null;
+  page.onEnter = () => {
+    if (game || !window.Runner) return;
+    game = window.Runner.create(box, {
+      best: state.runnerBest || 0,
+      onEnd(points, best) {
+        score.textContent = `RÉCORD: ${best}`;
+        const first = !state.runner;
+        save({ runner: true, runnerBest: best });
+        if (first) {
+          buddy.say(`¡${points}! Nada mal. Podés seguir… o intentarlo de nuevo.`, "happy");
+          setReady(page);
+        } else if (points >= best) {
+          buddy.say("¡Nuevo récord!", "happy");
+        }
+      },
+    });
+    buddy.say("Tocá la pantalla para saltar.");
+  };
+  return page;
+}
+
+/* ───────── Misiones físicas (mensaje invisible, escondite…) ───────── */
+
+// Una hoja que la manda a hacer algo en el mundo real y le pide la palabra que encontró
+function missionPage(cfg, key) {
+  const page = makePage("page--mission", cfg.titulo);
+  page.key = key;
+  const code = normalizePassword(String(cfg.codigo)).replace(/[^A-Z0-9]/g, "");
+  const field = codeField(code.length, /^\d+$/.test(code));
+  const msg = el("p", { class: "code__msg", role: "status", "aria-live": "polite" });
+  const hint = el("p", { class: "lock__hint", text: cfg.pista, hidden: true });
+  const hintBtn = el("button", { class: "hint-btn", type: "button", text: "¿Pista?" });
+  hintBtn.addEventListener("click", () => { hint.hidden = !hint.hidden; });
+  const icon = el("div", { class: "mission__icon" }, window.Pixel?.icon(cfg.icono ?? "star", { scale: 7 }).el ?? null);
+  page.body.append(
+    el("p", { class: "mission__tag", text: cfg.etiqueta ?? "MISIÓN" }),
+    el("h2", { class: "number__title", text: cfg.titulo }),
+    el("p", { class: "number__text", text: cfg.texto }),
+    icon, field.el, msg, cfg.pista ? hintBtn : null, hint);
+  page.el.append(doodle("sparkle", "doodle--mission"), doodle("star", "doodle--mission-b"));
+
+  const solved = () => {
+    field.set(code);
+    field.input.disabled = true;
+    field.tilesBox.classList.add("is-ok");
+    icon.classList.add("is-done");
+    msg.remove();
+    hintBtn.remove();
+    hint.remove();
+    page.body.append(el("p", { class: "number__ok", text: cfg.ok ?? "¡Misión cumplida!" }));
+  };
+  if (state[key]) {
+    solved();
+    return page;
+  }
+
+  page.ready = false;
+  const NOPE = ["Esa no es.", "Tampoco… mirá bien.", "Casi. Probá de nuevo."];
+  let tries = 0;
+  field.onComplete = (v) => {
+    if (v === code) {
+      field.input.blur();
+      save({ [key]: true });
+      solved();
+      window.Pixel?.sfx("coin");
+      const r = icon.getBoundingClientRect();
+      confetti.burst(r.left + r.width / 2, r.top + r.height / 2, 140);
+      vibrate([30, 40, 90]);
+      buddy.say(cfg.festejo ?? "¡Misión cumplida!", "happy");
+      setReady(page);
+      return;
+    }
+    msg.textContent = NOPE[tries++ % NOPE.length];
+    window.Pixel?.sfx("error");
+    if (tries === 2 && cfg.ayuda) buddy.say(cfg.ayuda);
+    field.tilesBox.classList.remove("is-error");
+    void field.tilesBox.offsetWidth;
+    field.tilesBox.classList.add("is-error");
+    vibrate([60, 40, 60]);
+    setTimeout(() => { field.set(""); field.input.focus(); }, 650);
+  };
+  page.onEnter = () => { if (cfg.alEntrar) buddy.say(cfg.alEntrar); };
+  return page;
+}
+
+/* ───────── Nivel: adiviná la canción ───────── */
+
+// Los fragmentos vienen cifrados en audio.enc.js (se cargan recién al llegar a esta hoja)
+let audioScript;
+function loadAudioScript() {
+  audioScript ??= new Promise((resolve, reject) => {
+    if (window.AUDIO_ENC) return resolve();
+    const v = window.GIFT_ENC?.audio ? `?v=${window.GIFT_ENC.audio}` : "";
+    document.head.append(el("script", { src: `audio.enc.js${v}`, onload: resolve, onerror: reject }));
+  });
+  return audioScript;
+}
+async function decryptAudio(i) {
+  await loadAudioScript();
+  const part = window.AUDIO_ENC?.[i];
+  if (!part) throw new Error("sin audio");
+  const key = await crypto.subtle.importKey("raw", fromB64(state.key), "AES-GCM", false, ["decrypt"]);
+  const buf = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(part.iv) }, key, fromB64(part.data));
+  return URL.createObjectURL(new Blob([buf], { type: part.type }));
+}
+
+function songPage(gift) {
+  const page = makePage("page--song", "Adiviná la canción");
+  page.key = "cancion";
+  const rondas = gift.adivinaCancion.rondas;
+  const dots = rondas.map(() => el("span", { class: "quiz__dot" }));
+  const play = el("button", { class: "btn btn--wax song__play", type: "button", text: "▶ ESCUCHAR" });
+  const eq = el("span", { class: "song__eq", "aria-hidden": "true" }, [1, 2, 3, 4, 5].map(() => el("i")));
+  const opts = el("div", { class: "guess__opts" });
+  const msg = el("p", { class: "guess__reply", "aria-live": "polite" });
+  page.body.append(
+    el("h2", { class: "number__title", text: "Adiviná la canción" }),
+    el("p", { class: "number__text", text: "Subí el volumen y escuchá." }),
+    el("div", { class: "quiz__progress" }, dots),
+    el("div", { class: "song__player" }, play, eq),
+    opts, msg);
+
+  const done = () => {
+    dots.forEach((d) => d.classList.add("is-done"));
+    play.disabled = true;
+    opts.replaceChildren();
+    msg.textContent = "¡Las adivinaste todas!";
+  };
+  if (state.cancion) {
+    done();
+    return page;
+  }
+  page.ready = false;
+
+  let ronda = 0;
+  let audio = null;
+  const stop = () => {
+    audio?.pause();
+    eq.classList.remove("is-on");
+  };
+  const show = () => {
+    const r = rondas[ronda];
+    dots.forEach((d, i) => {
+      d.classList.toggle("is-done", i < ronda);
+      d.classList.toggle("is-now", i === ronda);
+    });
+    msg.textContent = "";
+    audio = null;
+    play.textContent = "▶ ESCUCHAR";
+    opts.replaceChildren(...r.opciones.map((texto, i) => {
+      const b = el("button", { class: "guess__opt", type: "button", text: texto });
+      b.addEventListener("click", () => {
+        if (b.disabled) return;
+        if (i === r.correcta) {
+          stop();
+          window.Pixel?.sfx("coin");
+          b.classList.add("is-picked");
+          msg.textContent = r.respuesta ?? "¡Sí!";
+          buddy.say(r.respuesta ?? "¡Esa era!", "happy");
+          [...opts.children].forEach((o) => { o.disabled = true; });
+          setTimeout(() => {
+            ronda++;
+            if (ronda < rondas.length) return show();
+            done();
+            save({ cancion: true });
+            window.Pixel?.sfx("power");
+            setReady(page);
+          }, 1500);
+        } else {
+          b.disabled = true;
+          b.classList.add("is-picked");
+          window.Pixel?.sfx("error");
+          msg.textContent = "Nop. Escuchá de nuevo.";
+        }
+      });
+      return b;
+    }));
+  };
+  play.addEventListener("click", async () => {
+    try {
+      if (!audio) {
+        play.textContent = "…";
+        audio = new Audio(await decryptAudio(ronda));
+        audio.addEventListener("ended", () => eq.classList.remove("is-on"));
+      }
+      audio.currentTime = 0;
+      await audio.play();
+      eq.classList.add("is-on");
+      play.textContent = "↻ OTRA VEZ";
+    } catch {
+      play.textContent = "▶ ESCUCHAR";
+      msg.textContent = "No se pudo reproducir. Probá de nuevo.";
+    }
+  });
+  page.onEnter = () => buddy.say("¡Subí el volumen!");
+  show();
+  return page;
+}
+
+/* ───────── Nivel: sacudí el celular ───────── */
+
+// Algo físico antes de la entrada: sacudir el teléfono (o, si el sensor no anda, tocar muchas veces)
+function shakePage(gift) {
+  const page = makePage("page--shake", "Sacudí el celular");
+  page.key = "sacudir";
+  const NEED = 12;
+  const bar = el("span", { class: "shake__fill" });
+  const box = el("div", { class: "shake__gift" }, window.Pixel?.icon("canBody", { scale: 5 }).el ?? null);
+  const perm = el("button", { class: "btn btn--ink", type: "button", text: "ACTIVAR SENSOR", hidden: true });
+  const tapAlt = el("button", { class: "skip-btn", type: "button", text: "¿No anda? Tocá la lata muchas veces", hidden: true });
+  page.body.append(
+    el("h2", { class: "number__title", text: "Desbloqueá tu regalo" }),
+    el("p", { class: "number__text", text: "Sacudí el celular." }),
+    box,
+    el("div", { class: "shake__bar" }, bar),
+    perm, tapAlt);
+  page.el.append(doodle("sparkle", "doodle--shake"), doodle("star", "doodle--shake-b"));
+
+  if (state.sacudir) {
+    bar.style.width = "100%";
+    return page;
+  }
+  page.ready = false;
+  let level = 0;
+  let last = 0;
+  let listening = false;
+  const bump = () => {
+    if (state.sacudir) return;
+    level = Math.min(NEED, level + 1);
+    bar.style.width = `${(level / NEED) * 100}%`;
+    box.classList.remove("is-shaking");
+    void box.offsetWidth;
+    box.classList.add("is-shaking");
+    window.Pixel?.blip("tobi");
+    vibrate(15);
+    if (level < NEED) return;
+    save({ sacudir: true });
+    window.Pixel?.sfx("power");
+    const r = box.getBoundingClientRect();
+    confetti.burst(r.left + r.width / 2, r.top + r.height / 2, 160);
+    buddy.say("¡Ahí está! Ahora raspá.", "love");
+    setReady(page);
+  };
+  const onMotion = (e) => {
+    const a = e.accelerationIncludingGravity || e.acceleration;
+    if (!a) return;
+    const force = Math.abs(a.x || 0) + Math.abs(a.y || 0) + Math.abs(a.z || 0);
+    const now = performance.now();
+    if (force > 32 && now - last > 160) {
+      last = now;
+      bump();
+    }
+  };
+  const listen = () => {
+    if (listening) return;
+    listening = true;
+    addEventListener("devicemotion", onMotion);
+  };
+  box.addEventListener("click", () => { if (!tapAlt.hidden) bump(); });
+  tapAlt.addEventListener("click", () => {
+    tapAlt.textContent = "Tocá la lata hasta llenar la barra";
+  });
+  perm.addEventListener("click", async () => {
+    try {
+      if ((await DeviceMotionEvent.requestPermission()) === "granted") {
+        perm.hidden = true;
+        listen();
+      }
+    } catch {}
+  });
+  page.onEnter = () => {
+    // iPhone pide permiso para el sensor (con un toque); Android no
+    if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") perm.hidden = false;
+    else listen();
+    setTimeout(() => { if (!state.sacudir) tapAlt.hidden = false; }, 6000);
+    buddy.say("¡Sacudilo fuerte!");
+  };
+  return page;
+}
+
 /* ───────── Hojas: canciones, fotos y cierre ───────── */
 
 function setlistPage(gift, frames = []) {
@@ -1319,6 +1628,7 @@ function finalPage(gift, frame) {
     yo.setMood("love");
     ella.setMood("love");
     page.body.append(el("div", { class: "duo", "aria-hidden": "true" }, yo.el, window.Pixel.heart({ scale: 3 }).el, ella.el));
+    page.body.append(el("button", { class: "scene__btn final__song", type: "button", text: "♪ CANCIÓN", onclick: () => window.Pixel.song("cumple") }));
   }
 
   // corazoncitos que suben mientras la última hoja está a la vista
@@ -1336,6 +1646,7 @@ function finalPage(gift, frame) {
   let timer = 0;
   page.onEnter = () => {
     buddy.say("Feliz cumple, Lu.", "love");
+    window.Pixel?.song("cumple");
     if (reduceMotion) return;
     for (let i = 0; i < 10; i++) setTimeout(spawn, i * 140);
     clearInterval(timer);
@@ -1344,6 +1655,129 @@ function finalPage(gift, frame) {
       spawn();
     }, 800);
   };
+  return page;
+}
+
+/* ───────── Última hoja: nosotros en el show (pixel art animado) ───────── */
+
+// Escena nocturna del recital: escenario con el cartel, la banda, luces que barren, el público saltando
+// y, adelante, los dos personajitos como en una selfie.
+function showPage(gift) {
+  const page = makePage("page--show", "En el show");
+  const W = 160;
+  const H = 104;
+  const canvas = el("canvas", { class: "show__canvas", "aria-label": "Nosotros en el show de Tan Biónica" });
+  const duo = el("div", { class: "show__duo", "aria-hidden": "true" });
+  if (window.Pixel) {
+    const yo = window.Pixel.sprite("tobi", { scale: 2 });
+    const ella = window.Pixel.sprite("lu", { scale: 2 });
+    yo.setMood("happy");
+    ella.setMood("happy");
+    duo.append(yo.el, window.Pixel.heart({ scale: 2 }).el, ella.el);
+  }
+  page.body.append(
+    el("h2", { class: "number__title", text: gift.show.fechaTexto.replace(/ de \d{4}$/, "") }),
+    el("p", { class: "number__text", text: "Nosotros, ahí." }),
+    el("div", { class: "show" }, canvas, duo));
+
+  const ctx = canvas.getContext("2d");
+  let k = 1;
+  const resize = () => {
+    const css = canvas.parentElement.clientWidth || 320;
+    k = Math.max(1, Math.floor((css * (window.devicePixelRatio || 1)) / W));
+    canvas.width = W * k;
+    canvas.height = H * k;
+  };
+  const px = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x) * k, Math.round(y) * k, w * k, h * k); };
+
+  // la banda: 4 siluetas con instrumentos (guitarra, voz, bajo, batería)
+  const band = [
+    { x: 46, kind: "guitar" }, { x: 70, kind: "mic" }, { x: 92, kind: "bass" }, { x: 114, kind: "drums" },
+  ];
+  const crowd = Array.from({ length: 22 }, (_, i) => ({ x: i * 7.5 - 2, phase: Math.random() * 6, hue: i % 3 }));
+  const bits = Array.from({ length: 26 }, () => ({ x: Math.random() * W, y: Math.random() * H, v: 6 + Math.random() * 10, c: ["#e0548c", "#e3b04b", "#fbe9c4", "#7fd0e8"][(Math.random() * 4) | 0] }));
+
+  let raf = 0;
+  let t0 = 0;
+  const draw = (now) => {
+    if (!page.el.classList.contains("is-current")) { raf = 0; return; }
+    const t = (now - t0) / 1000;
+    // cielo de noche
+    px(0, 0, W, H, "#1b1630");
+    for (let y = 0; y < 30; y += 2) px(0, y, W, 1, "rgba(80, 50, 120, .12)");
+    // luces que barren (triángulos de colores desde arriba)
+    const beams = [["rgba(224, 84, 140, .22)", 0], ["rgba(127, 208, 232, .2)", 2], ["rgba(227, 176, 75, .2)", 4]];
+    beams.forEach(([c, ph], i) => {
+      const sx = 30 + i * 50;
+      const ex = sx + Math.sin(t * 1.3 + ph) * 40;
+      ctx.fillStyle = c;
+      ctx.beginPath();
+      ctx.moveTo(sx * k, 8 * k);
+      ctx.lineTo((ex - 14) * k, 70 * k);
+      ctx.lineTo((ex + 14) * k, 70 * k);
+      ctx.closePath();
+      ctx.fill();
+    });
+    // escenario y estructura
+    px(20, 12, 120, 3, "#3a3550");
+    px(20, 12, 3, 52, "#3a3550");
+    px(137, 12, 3, 52, "#3a3550");
+    for (let x = 26; x < 136; x += 12) px(x, 15, 3, 2, ["#e0548c", "#7fd0e8", "#e3b04b"][((x / 12) + Math.floor(t * 3)) % 3 | 0]);
+    // cartel
+    px(46, 19, 68, 11, "#0f0c1d");
+    px(46, 19, 68, 1, "#e0548c");
+    px(46, 29, 68, 1, "#e0548c");
+    ctx.fillStyle = "#fbe9c4";
+    ctx.font = `${7 * k}px "Pixelify Sans", monospace`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("TAN BIÓNICA", 80 * k, 25 * k);
+    // tarima
+    px(20, 58, 120, 6, "#2a2440");
+    px(20, 58, 120, 1, "#4c4468");
+    // la banda (siluetas que se mueven al ritmo)
+    band.forEach((m, i) => {
+      const bob = Math.round(Math.abs(Math.sin(t * 4 + i)) * 1.5);
+      const x = m.x;
+      const y = 40 - bob;
+      px(x + 2, y, 4, 4, "#0b0914");          // cabeza
+      px(x + 1, y + 4, 6, 9, "#0b0914");      // cuerpo
+      px(x + 1, y + 13, 2, 5, "#0b0914");     // piernas
+      px(x + 5, y + 13, 2, 5, "#0b0914");
+      if (m.kind === "guitar" || m.kind === "bass") px(x - 1, y + 7, 9, 2, "#6b3f2a");
+      if (m.kind === "mic") px(x + 8, y + 3, 1, 15, "#888");
+      if (m.kind === "drums") { px(x - 3, y + 12, 12, 6, "#2f2a44"); px(x - 3, y + 12, 12, 1, "#e3b04b"); }
+    });
+    // público saltando (cabezas y brazos)
+    crowd.forEach((c, i) => {
+      const jump = Math.max(0, Math.sin(t * 5 + c.phase)) * 3;
+      const y = 74 - jump;
+      const col = ["#120f22", "#17132b", "#0e0b1b"][c.hue];
+      px(c.x, y, 6, 6, col);
+      px(c.x - 1, y + 6, 8, 30, col);
+      if (i % 4 === 0) { px(c.x - 2, y - 6 + jump, 2, 7, col); px(c.x + 6, y - 6 + jump, 2, 7, col); }
+      if (i % 7 === 3) px(c.x + 1, y - 9 + jump, 3, 3, "#fff6c4"); // una lucecita de celular
+    });
+    // papelitos
+    bits.forEach((b) => {
+      b.y += b.v / 60;
+      if (b.y > H) { b.y = -2; b.x = Math.random() * W; }
+      px(b.x, b.y, 1, 1, b.c);
+    });
+    raf = requestAnimationFrame(draw);
+  };
+
+  page.onEnter = () => {
+    resize();
+    if (!raf) {
+      t0 = performance.now();
+      raf = requestAnimationFrame(draw);
+    }
+    buddy.say("El 31 nos vemos ahí.", "love");
+    setTimeout(() => confetti.rain(120), 400);
+    window.Pixel?.sfx("power");
+  };
+  addEventListener("resize", () => { if (raf) resize(); });
   return page;
 }
 
@@ -1540,29 +1974,35 @@ const confetti = (() => {
 // Cada QR lleva a ?q=…: uno solo abre el cuaderno; los demás son señuelos. Sin ?q (el QR de la carta) es el inicio del juego.
 const QR_CORRECTO = "a4k9";
 const ESCENAS = {
+  // atrás de la carta
   inicio: [
     "?¡Hola, Lu!",
     "Soy yo… bueno, una versión mía en píxeles.",
-    "!Te tengo un regalo.",
+    "!Te preparé algo.",
     "Pensaste que era solo una carta, ¿no?",
     "Pero no te la voy a hacer tan fácil.",
-    "En algún lugar hay un código QR que te lleva a tu regalo.",
-    "Hay varios… pero uno solo es el correcto.",
-    "Están escondidos por ahí: en tu pieza, en lo que te regalé…",
+    "Escondí varios códigos QR por la casa.",
+    "Uno está donde paso horas con la compu…",
+    "otro, cerca de donde mirás series…",
+    "y otro lo cuida alguien que te regalé.",
+    "Solo uno es el correcto.",
     "Cuando encuentres uno, escanealo con la cámara del celular.",
-    "!¡Empecemos la búsqueda!",
+    "!¡Empecemos!",
   ],
+  // el QR que tiene Snoopy
   correcto: [
     "?¡Eh! ¿Cómo llegaste hasta acá?",
-    "!Bueno… creo que estás en el lugar correcto.",
-    "Pero no te emociones: esto recién empieza.",
-    "Te preparé un cuaderno con algunas pruebas.",
-    "!Abrilo y vamos.",
+    "!Snoopy te lo cuidó bien.",
+    "Bueno… creo que estás en el lugar correcto.",
+    "Pero esto recién empieza.",
+    "Para abrir el cuaderno vas a necesitar una palabra.",
+    "Está escondida en algún lado de la carta…",
+    "!Mirá bien.",
   ],
   señuelos: {
-    m2x7: ["Mmm…", "?Creo que este no es.", "Seguí buscando."],
-    t8p3: ["!¡Ja! Caíste.", "Este QR no lleva a ningún lado.", "Probá con otro."],
-    w5r1: ["?¿Otra vez vos?", "Este tampoco es…", "Pista: no todas las latas son iguales."],
+    m2x7: ["?¿En la compu?", "Muy de programador… pero no.", "Este no es. Seguí buscando."], // compu
+    t8p3: ["!¡Ja! ¿Pensaste que estaba en la tele?", "Este tampoco es.", "Pista: buscá a alguien blanco y negro…"], // tele
+    w5r1: ["?Mmm… este no es.", "Seguí buscando."], // de repuesto
   },
   señueloGenerico: ["?Mmm… este no es.", "Seguí buscando."],
 };
@@ -1601,6 +2041,17 @@ async function runScene(kind, lines) {
     }
   }
   if (kind === "correcto") {
+    // antes de abrir el cuaderno: subir el volumen (hay música, sonidos y una canción para adivinar)
+    end.hidden = false;
+    const test = el("button", { class: "scene__btn", type: "button", text: "♪ PROBAR SONIDO" });
+    const go = el("button", { class: "scene__start scene__start--go", type: "button", text: "LISTO ▶" });
+    end.append(
+      el("strong", { text: "¡SUBÍ EL VOLUMEN!" }),
+      el("span", { text: "Este juego tiene sonido. Ponelo al máximo." }),
+      el("div", { class: "scene__btns" }, test, go));
+    sprite?.setMood("surprised");
+    test.addEventListener("click", () => window.Pixel?.sfx("power"));
+    await new Promise((resolve) => go.addEventListener("click", resolve, { once: true }));
     sprite?.setMood("happy");
     scene.classList.add("is-leaving");
     await sleep(700);
@@ -1631,10 +2082,10 @@ const buddy = (() => {
       hud.show();
       fitBook();
     },
-    say(text, mood = "normal") {
+    say(text, mood = "normal", duration = 3200) {
       if (!sprite) return false;
       sprite.setMood(mood);
-      window.Pixel.bubble(anchor, text, { who: "tobi", duration: 3200 })
+      window.Pixel.bubble(anchor, text, { who: "tobi", duration })
         .then(() => sprite?.setMood("normal"))
         .catch(() => {});
       return true;
@@ -1645,7 +2096,7 @@ const buddy = (() => {
 // HUD del juego: nivel (hoja actual) y un corazón por cada prueba superada
 const hud = (() => {
   let box = null;
-  const PRUEBAS = [() => true, () => state?.numero, () => state?.detalle, () => state?.adivinanza, () => state?.revealed];
+  const pruebas = () => [true, ...book.pages.filter((p) => p.key).map((p) => Boolean(state?.[p.key]))];
   return {
     show() {
       if (box || !window.Pixel) return;
@@ -1655,9 +2106,9 @@ const hud = (() => {
     },
     refresh() {
       if (!box) return;
-      const hearts = PRUEBAS.map((ok) => {
-        const icon = window.Pixel.icon("heart", { scale: 3 }).el;
-        if (!ok()) icon.classList.add("is-empty");
+      const hearts = pruebas().map((ok) => {
+        const icon = window.Pixel.icon("heart", { scale: 2 }).el;
+        if (!ok) icon.classList.add("is-empty");
         return icon;
       });
       box.replaceChildren(
@@ -1718,6 +2169,8 @@ if (q !== QR_CORRECTO) {
       buddy.show();
       return sleep(2600);
     })
-    .then(turnIntro);
+    .then(turnIntro)
+    .then(() => sleep(1600))
+    .then(() => { if (!state) buddy.say("La palabra está escondida en la carta…"); });
 }
 })();

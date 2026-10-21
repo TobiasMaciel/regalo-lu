@@ -2,8 +2,10 @@
 // Escribe gift.enc.js, fotos.enc.js y adelanto.js (lo único que se publica) y actualiza las versiones en index.html.
 // Uso: node scripts/encrypt.mjs <CONTRASEÑA>
 import { readFile, readdir, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { webcrypto as crypto, createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 import sharp from "sharp";
 
 export const ITERATIONS = 250000;
@@ -80,9 +82,31 @@ for (const f of fotos) {
 const fotosJs = `window.FOTOS_ENC = ${JSON.stringify(sealedPhotos)};\n`;
 await writeFile(root("fotos.enc.js"), fotosJs);
 
+// Adiviná la canción: corta un fragmento de cada audio de privado/canciones/ (con ffmpeg) y lo cifra.
+// Si falta algún archivo, esa hoja no aparece.
+const sealedAudio = [];
+const rondas = gift.adivinaCancion?.rondas ?? [];
+for (const r of rondas) {
+  const file = fileURLToPath(root(`privado/canciones/${r.archivo}`));
+  try {
+    const mp3 = execFileSync("ffmpeg", ["-v", "error", "-ss", String(r.desde ?? 0), "-t", String(r.duracion ?? 12), "-i", file,
+      "-ac", "1", "-b:a", "80k", "-af", "afade=t=in:d=0.4", "-f", "mp3", "pipe:1"], { maxBuffer: 64 * 1024 * 1024 });
+    sealedAudio.push({ type: "audio/mpeg", ...(await seal(mp3)) });
+  } catch (err) {
+    const motivo = String(err.message).split(/[\r\n]/)[0];
+    console.warn(`⚠ No pude usar privado/canciones/${r.archivo} (${motivo}). La hoja "Adiviná la canción" no va a aparecer.`);
+    sealedAudio.length = 0;
+    delete gift.adivinaCancion;
+    break;
+  }
+}
+const audioJs = `window.AUDIO_ENC = ${JSON.stringify(sealedAudio)};
+`;
+await writeFile(root("audio.enc.js"), audioJs);
+
 // "fotos" le dice a app.js qué versión de fotos.enc.js pedir
 const giftSealed = await seal(enc.encode(JSON.stringify(gift)));
-const out = { v: 1, iterations: ITERATIONS, salt: b64(salt), fotos: version(fotosJs), ...giftSealed };
+const out = { v: 1, iterations: ITERATIONS, salt: b64(salt), fotos: version(fotosJs), audio: version(audioJs), ...giftSealed };
 await writeFile(root("gift.enc.js"), `window.GIFT_ENC = ${JSON.stringify(out, null, 2)};\n`);
 
 // Adelanto para el candado: miniaturas diminutas y desenfocadas (no se reconoce a nadie), sin cifrar
@@ -96,7 +120,8 @@ await writeFile(root("adelanto.js"), `window.ADELANTO = ${JSON.stringify(teaser)
 
 // index.html pide cada archivo con su versión (?v=…)
 let html = await readFile(root("index.html"), "utf8");
-for (const name of ["styles.css", "pixel.css", "app.js", "pixel.js", "gift.enc.js", "adelanto.js"]) {
+for (const name of ["styles.css", "pixel.css", "runner.css", "app.js", "pixel.js", "runner.js", "gift.enc.js", "adelanto.js"]) {
+  if (!existsSync(root(name))) continue;
   const v = version(await readFile(root(name), "utf8"));
   const escaped = name.replace(/\./g, "\\.");
   html = html.replace(new RegExp(`${escaped}(\\?v=[0-9a-f]+)?"`, "g"), `${name}?v=${v}"`);

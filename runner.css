@@ -1,0 +1,22 @@
+/* runner.css — contenedor del mini-juego (va con runner.js) */
+.runner {
+  width: 100%;
+  line-height: 0;
+  text-align: center;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.runner-canvas {
+  display: inline-block;
+  max-width: 100%;
+  background: #ebe5d8;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  touch-action: none;
+  -ms-touch-action: none;
+  -webkit-touch-callout: none;
+  cursor: pointer;
+  outline: none;
+}
+.runner-canvas:focus-visible { outline: 2px dashed #c2456b; outline-offset: 2px; }

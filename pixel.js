@@ -768,12 +768,64 @@
     } catch (e) { /* nada */ }
   }
 
+  /* ───────── canciones en 8-bit ───────── */
+  var NOTE = { G3: 196, C4: 261.63, E4: 329.63, F4: 349.23, G4: 392, A4: 440, B4: 493.88, C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99 };
+  var SONGS = {
+    // Feliz cumpleaños (melodía tradicional), en 3/4
+    cumple: {
+      bpm: 120,
+      notes: [
+        ["G4", .75], ["G4", .25], ["A4", 1], ["G4", 1], ["C5", 1], ["B4", 2],
+        ["G4", .75], ["G4", .25], ["A4", 1], ["G4", 1], ["D5", 1], ["C5", 2],
+        ["G4", .75], ["G4", .25], ["G5", 1], ["E5", 1], ["C5", 1], ["B4", 1], ["A4", 2],
+        ["F5", .75], ["F5", .25], ["E5", 1], ["C5", 1], ["D5", 1], ["C5", 3]
+      ],
+      // un bajo suave por compás: do, sol, do, fa, do, sol, do
+      bass: [["C4", 3], ["G3", 3], ["G3", 3], ["C4", 3], ["C4", 3], ["F4", 3], ["C4", 3], ["G3", 3], ["C4", 3]]
+    }
+  };
+  var playing = [];
+  function stopSong() {
+    playing.forEach(function (o) { try { o.stop(); } catch (e) { /* ya paró */ } });
+    playing = [];
+  }
+  function voice(type, freq, t, dur, vol) {
+    var o = actx.createOscillator(), g = actx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.setValueAtTime(vol, t + dur * 0.75);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur * 0.98);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur);
+    playing.push(o);
+  }
+  function song(name) {
+    var s = SONGS[name];
+    if (!s || !actx || actx.state !== "running") return { stop: stopSong };
+    stopSong();
+    var beat = 60 / s.bpm, t = actx.currentTime + 0.1, total = 0;
+    s.notes.forEach(function (n) {
+      voice("square", NOTE[n[0]], t + total * beat, n[1] * beat, 0.035);
+      total += n[1];
+    });
+    // el bajo arranca después del "pique" (la primera nota es anacrusa)
+    var b = 1;
+    s.bass.forEach(function (n) {
+      voice("triangle", NOTE[n[0]] / 2, t + b * beat, n[1] * beat, 0.05);
+      b += n[1];
+    });
+    return { stop: stopSong, duration: total * beat };
+  }
+
   window.Pixel = {
     unlockAudio: unlockAudio,
     sprite: sprite,
     heart: heart,
     icon: icon,
     sfx: sfx,
+    song: song,
     dialog: dialog,
     bubble: bubble,
     blip: function (who) { blip(ART[who] ? who : "tobi"); },

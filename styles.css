@@ -1661,6 +1661,123 @@ body::before {
 .hud__hearts { display: flex; gap: 4px; line-height: 0; }
 .hud .px-icon.is-empty { filter: grayscale(1) opacity(.35); }
 
+/* ═════════════ Niveles nuevos ═════════════ */
+
+/* pantalla de volumen (antes de abrir el cuaderno) */
+.scene__btns { display: flex; justify-content: center; gap: 14px; margin-top: 16px; flex-wrap: wrap; }
+.scene__btn {
+  appearance: none;
+  padding: 12px 16px;
+  border: 0;
+  background: #ebe5d8;
+  box-shadow: 0 0 0 3px #242322, var(--hard);
+  font: 600 15px/1 var(--serif);
+  letter-spacing: .08em;
+  color: #242322;
+  cursor: pointer;
+}
+.scene__btn:active { transform: translate(3px, 3px); }
+.scene__start--go { margin-top: 0; animation: none; }
+
+/* hojas de juego: título arriba, juego al medio */
+.page--runner .page__body,
+.page--song .page__body,
+.page--shake .page__body { align-items: center; justify-content: center; text-align: center; }
+
+/* Lu en salchicha */
+.runner-box {
+  width: 100%;
+  margin: 18px 0 8px;
+  box-shadow: 0 0 0 3px #242322, var(--hard);
+  background: #f6f1e6;
+  touch-action: none;
+  line-height: 0;
+}
+.runner__score { min-height: 1.3em; margin-top: 12px; }
+.doodle--runner { right: 30px; top: 40px; }
+
+/* misiones físicas */
+.page--mission .page__body { align-items: center; justify-content: center; text-align: center; }
+.mission__tag {
+  margin: 0 0 8px;
+  padding: 4px 10px;
+  background: #242322;
+  color: #e3b04b;
+  font: 600 13px/1 var(--serif);
+  letter-spacing: .18em;
+}
+.mission__icon { margin: 18px 0 20px; line-height: 0; animation: can-bob 1.4s steps(2) infinite; }
+.mission__icon.is-done { animation: px-pop .5s steps(4); }
+.number__field .tile { height: min(54px, calc(var(--w) / var(--n) * 1.25)); font-size: min(32px, calc(var(--w) / var(--n) * .7)); }
+.number__field .code__tiles { gap: min(10px, calc(var(--w) / var(--n) * .16)); }
+.doodle--mission { left: 60px; top: 120px; }
+.doodle--mission-b { right: 48px; top: 96px; }
+
+/* adiviná la canción */
+.song__player { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 14px 0 6px; }
+.song__eq { display: flex; align-items: flex-end; gap: 3px; height: 28px; }
+.song__eq i { width: 6px; height: 6px; background: var(--pen); }
+.song__eq.is-on i { animation: eq .5s steps(4) infinite alternate; }
+.song__eq.is-on i:nth-child(2) { animation-delay: -.2s; }
+.song__eq.is-on i:nth-child(3) { animation-delay: -.35s; }
+.song__eq.is-on i:nth-child(4) { animation-delay: -.1s; }
+.song__eq.is-on i:nth-child(5) { animation-delay: -.3s; }
+@keyframes eq { to { height: 28px; } }
+.page--song .quiz__progress { margin-top: 10px; }
+.page--song .guess__opts { width: 100%; }
+.quiz__progress { display: flex; justify-content: center; gap: 8px; }
+.quiz__dot { width: 10px; height: 10px; background: rgba(36, 35, 34, .2); }
+.quiz__dot.is-done { background: var(--pen); }
+.quiz__dot.is-now { background: var(--ink); }
+
+/* sacudí el celular */
+.shake__gift { margin: 22px 0 18px; cursor: pointer; line-height: 0; }
+.shake__gift.is-shaking { animation: shake-gift .35s steps(4); }
+@keyframes shake-gift {
+  25% { transform: translateX(-6px) rotate(-6deg); }
+  50% { transform: translateX(6px) rotate(6deg); }
+  75% { transform: translateX(-3px) rotate(-3deg); }
+}
+.shake__bar {
+  width: 80%;
+  height: 18px;
+  margin-bottom: 18px;
+  background: rgba(255, 255, 255, .55);
+  box-shadow: 0 0 0 3px #242322;
+}
+.shake__fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: repeating-linear-gradient(90deg, var(--pen) 0 8px, #d9668b 8px 16px);
+  transition: width .2s steps(3);
+}
+.doodle--shake { left: 64px; top: 140px; }
+.doodle--shake-b { right: 50px; top: 120px; }
+
+/* última hoja: nosotros en el show */
+.page--show .page__body { align-items: center; justify-content: center; text-align: center; }
+.show {
+  position: relative;
+  width: 100%;
+  margin-top: 16px;
+  line-height: 0;
+  box-shadow: 0 0 0 3px #242322, var(--hard);
+  background: #1b1630;
+}
+.show__canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+.show__duo {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  transform: translateX(-50%);
+}
+.page.is-current:not(.is-seen) .show__duo { animation: rise-in 1s .6s var(--ease-out) both; }
+.final__song { margin-top: 10px; }
+
 /* ───────── En el celular: sin efectos pesados (evita parpadeos) ───────── */
 @media (hover: none) {
   /* el cuaderno solo se escala: sin perspectiva permanente (en Safari hace parpadear las hojas) */
