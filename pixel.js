@@ -684,6 +684,19 @@
       ],
       pal: { o: "#242322", P: "#c2456b", Y: "#f2c94c" }
     },
+    // la entrada que sale de la caja
+    ticket: {
+      rows: [
+        "oooooooooooooo",
+        "oYYYYYYYYYoYYo",
+        "oYPPPPPPYYoYYo",
+        "oYYYYYYYYY.YYo",
+        "oYPPPPYYYYoYYo",
+        "oYYYYYYYYYoYYo",
+        "oooooooooooooo"
+      ],
+      pal: { o: "#242322", P: "#c2456b", Y: "#f2c94c" }
+    },
     // pistas de la búsqueda de palabras: la compu, el baño y Snoopy
     laptop: {
       rows: [

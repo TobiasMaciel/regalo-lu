@@ -256,7 +256,7 @@ function nudgeLocked() {
 (() => {
   // se puede arrastrar desde cualquier lado (fotos y botones incluidos: si fue arrastre, el toque no cuenta),
   // salvo donde el dedo ya hace otra cosa: raspar, escribir o perseguir al "No"
-  const NO_DRAG = "input, .scratch, .btn--no, dialog, .runner-box";
+  const NO_DRAG = "input, .btn--no, dialog, .runner-box, .pinata";
   const clamp = (v) => Math.min(1, Math.max(0, v));
   let d = null;
   let draggedAt = -1e9; // el "click" que el navegador dispara al soltar un arrastre no debe contar como toque
@@ -654,9 +654,9 @@ function barcode(seed) {
   let y = 0;
   let bars = "";
   while (y < 62) {
-    const t = .6 + Math.floor(rand() * 3) * .6;
-    bars += `<rect y="${y.toFixed(1)}" width="34" height="${t.toFixed(1)}"/>`;
-    y += t + .6 + Math.floor(rand() * 2) * .6;
+    const t = 1 + Math.floor(rand() * 3); // barras enteras: se ven en píxeles
+    bars += `<rect y="${y}" width="34" height="${t}"/>`;
+    y += t + 1 + Math.floor(rand() * 2);
   }
   return `<svg class="ticket__barcode" viewBox="0 0 34 64" preserveAspectRatio="none" fill="#1d1c1b" aria-hidden="true">${bars}</svg>`;
 }
@@ -683,6 +683,7 @@ function buildTicket(gift) {
         row("Sector", s.sector),
         row("Titular", s.titulares.join(" & ")))),
     el("div", { class: "ticket__stub" },
+      el("span", { class: "ticket__star", "aria-hidden": "true" }, window.Pixel?.icon("heart", { scale: 2 }).el ?? null),
       el("span", { class: "ticket__admit", text: "Admite" }),
       el("span", { class: "ticket__qty", text: String(s.cantidad) }),
       el("span", { class: "ticket__code", text: number }),
@@ -693,29 +694,29 @@ function ticketPage(gift, frames) {
   const page = makePage("page--gift", "Tu regalo");
   page.key = "revealed";
   const ticket = buildTicket(gift);
-  const canvas = el("canvas", { class: "scratch", "aria-hidden": "true" });
-  const wrap = el("div", { class: "ticket-wrap is-covered" }, ticket, canvas);
-  const skip = el("button", { class: "skip-btn", type: "button", text: "¿No te deja rascar? Tocá acá", hidden: true });
+  const wrap = el("div", { class: "ticket-wrap" }, ticket);
   page.body.append(
     el("div", { class: "glued" }, wrap,
       el("span", { class: "tape tape--tl", "aria-hidden": "true" }),
       el("span", { class: "tape tape--br", "aria-hidden": "true" })),
-    skip,
     frames.length ? el("div", { class: "stuck-row" },
       stick(frames[0], "stuck--gift", -5, 0),
       stick(frames[1], "stuck--gift-b", 6, 1)) : null);
   page.el.append(doodle("star", "doodle--gift"), doodle("sparkle", "doodle--gift-b"));
 
-  if (state.revealed) {
-    canvas.remove();
-    wrap.classList.remove("is-covered");
-    return page;
-  }
+  // tocarla le vuelve a pasar el brillo
+  wrap.addEventListener("click", () => {
+    ticket.classList.remove("is-shining");
+    void ticket.offsetWidth;
+    ticket.classList.add("is-shining");
+  });
+  if (state.revealed) return page;
 
+  // la entrada sale de la caja y se pega sola: festejo y la pregunta
   page.ready = false;
-  let finish = null;
-  const onRevealed = () => {
-    skip.hidden = true;
+  page.onEnter = async () => {
+    if (state.revealed) return;
+    await sleep(1000);
     ticket.classList.add("is-shining");
     const r = wrap.getBoundingClientRect();
     confetti.burst(r.left + r.width / 2, r.top + r.height / 2, 150);
@@ -726,111 +727,7 @@ function ticketPage(gift, frames) {
     window.Pixel?.sfx("power");
     setTimeout(() => setReady(page), 900);
   };
-  // la lámina se pinta ya, con la hoja todavía tapada: nunca se ve la entrada antes de tiempo
-  requestAnimationFrame(() => {
-    setupScratch(canvas, onRevealed).then((f) => {
-      finish = f;
-      wrap.classList.remove("is-covered");
-    });
-  });
-  skip.addEventListener("click", () => finish?.());
-  // ya raspada, tocarla le vuelve a pasar el brillo
-  wrap.addEventListener("click", () => {
-    if (!state.revealed) return;
-    ticket.classList.remove("is-shining");
-    void ticket.offsetWidth;
-    ticket.classList.add("is-shining");
-  });
-  page.onEnter = () => {
-    setTimeout(() => { if (!state.revealed) skip.hidden = false; }, 12000);
-  };
   return page;
-}
-
-async function setupScratch(canvas, onDone) {
-  try { await Promise.race([document.fonts.ready, sleep(1200)]); } catch {}
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  // offsetWidth/Height: tamaño real sin la rotación de la entrada pegada
-  const w = canvas.offsetWidth;
-  const h = canvas.offsetHeight;
-  canvas.width = Math.round(w * dpr);
-  canvas.height = Math.round(h * dpr);
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  ctx.scale(dpr, dpr);
-
-  // lámina dorada pixelada (cuadritos de 6 px en dos tonos)
-  const P = 6;
-  for (let y = 0; y < h; y += P) {
-    for (let x = 0; x < w; x += P) {
-      const shade = ((x / P + y / P) % 2) ? "#d9b25c" : "#c99a45";
-      ctx.fillStyle = Math.random() < .06 ? "#f3dc9a" : shade;
-      ctx.fillRect(x, y, P, P);
-    }
-  }
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#3b2610";
-  ctx.font = `700 ${Math.round(Math.min(w / 9, 32))}px "Pixelify Sans", "VT323", monospace`;
-  ctx.fillText("RASCÁ ACÁ", w / 2, h / 2 + 6);
-  ctx.font = `400 14px "Pixelify Sans", "VT323", monospace`;
-  ctx.fillStyle = "rgba(59, 38, 16, .75)";
-  ctx.fillText("con el dedo", w / 2, h / 2 + 30);
-  ctx.fillText("★", w / 2, h / 2 - 28);
-
-  ctx.globalCompositeOperation = "destination-out";
-  ctx.strokeStyle = "#000"; // opaco: borra la lámina del todo
-  ctx.fillStyle = "#000";
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.lineWidth = Math.max(30, w / 10);
-
-  let last = null;
-  let moves = 0;
-  let finished = false;
-  // offsetX/Y ya vienen en coordenadas locales (descuentan la rotación)
-  const point = (e) => ({ x: e.offsetX, y: e.offsetY });
-  const cleared = () => {
-    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    let clear = 0;
-    let total = 0;
-    for (let i = 3; i < data.length; i += 4 * 24) {
-      total++;
-      if (data[i] < 40) clear++;
-    }
-    return clear / total;
-  };
-  const finish = () => {
-    if (finished) return;
-    finished = true;
-    canvas.classList.add("is-clearing");
-    setTimeout(() => canvas.remove(), 750);
-    onDone();
-  };
-
-  canvas.addEventListener("pointerdown", (e) => {
-    canvas.setPointerCapture(e.pointerId);
-    last = point(e);
-    ctx.beginPath();
-    ctx.arc(last.x, last.y, ctx.lineWidth / 2, 0, Math.PI * 2);
-    ctx.fill();
-  });
-  canvas.addEventListener("pointermove", (e) => {
-    if (!last || finished) return;
-    const p = point(e);
-    ctx.beginPath();
-    ctx.moveTo(last.x, last.y);
-    ctx.lineTo(p.x, p.y);
-    ctx.stroke();
-    last = p;
-    if (++moves % 6 === 0) {
-      if (moves % 18 === 0) vibrate(4);
-      if (cleared() > .52) finish();
-    }
-  });
-  const up = () => { last = null; };
-  canvas.addEventListener("pointerup", up);
-  canvas.addEventListener("pointercancel", up);
-
-  return finish;
 }
 
 /* ───────── Hoja: ¿Vamos? ───────── */
@@ -1497,8 +1394,8 @@ function songPage(gift) {
 
 /* ───────── Nivel: la piñata ───────── */
 
-// Golpear la piñata (tocándola; si el celular tiene sensor, sacudirlo también cuenta) hasta que se rompe,
-// cae un regalo y, al tocarlo, se abre y pasa a la entrada para raspar.
+// Pegarle a la piñata sacudiendo el celular (o tocándola, si el sensor no anda) hasta que se rompe;
+// cae el regalo, rebota, se abre solo y asoma la entrada.
 function pinataPage(gift) {
   const page = makePage("page--pinata", "La piñata");
   page.key = "pinata";
@@ -1506,14 +1403,14 @@ function pinataPage(gift) {
   const pinata = el("button", { class: "pinata", type: "button", "aria-label": "Pegale a la piñata" },
     el("span", { class: "pinata__rope" }),
     el("span", { class: "pinata__body" }, window.Pixel?.icon("pinata", { scale: 6 }).el ?? null));
-  const present = el("button", { class: "gift-drop", type: "button", "aria-label": "Tu regalo", hidden: true },
+  const present = el("div", { class: "gift-drop", "aria-label": "Tu regalo", hidden: true },
     el("span", { class: "gift-drop__lid" }, window.Pixel?.icon("giftLid", { scale: 7 }).el ?? null),
-    el("span", { class: "gift-drop__base" }, window.Pixel?.icon("giftBase", { scale: 7 }).el ?? null),
-    el("span", { class: "gift-drop__tap", text: "TOCALO" }));
+    el("span", { class: "gift-drop__ticket" }, window.Pixel?.icon("ticket", { scale: 6 }).el ?? null),
+    el("span", { class: "gift-drop__base" }, window.Pixel?.icon("giftBase", { scale: 7 }).el ?? null));
   const stage = el("div", { class: "pinata-stage" }, pinata, present);
   const bar = el("span", { class: "shake__fill" });
   const title = el("h2", { class: "number__title", text: "¡Pegale a la piñata!" });
-  const text = el("p", { class: "number__text", text: "Tocala fuerte. No se rompe tan fácil…" });
+  const text = el("p", { class: "number__text", text: "Sacudí el celu fuerte… o tocala." });
   page.body.append(title, text, stage, el("div", { class: "shake__bar" }, bar));
   page.el.append(doodle("star", "doodle--shake"), doodle("sparkle", "doodle--shake-b"));
 
@@ -1531,11 +1428,28 @@ function pinataPage(gift) {
   }
   page.ready = false;
 
+  // péndulo: ángulo en grados; se mece solito y cada golpe le da un empujón
+  let ang = 0;
+  let vel = 0;
+  let raf = 0;
+  let prev = 0;
+  const swing = (t) => {
+    if (book.pages[book.index] !== page) { raf = 0; prev = 0; return; } // solo mientras está a la vista
+    const dt = Math.min(.05, (t - (prev || t)) / 1000);
+    prev = t;
+    vel += (-40 * ang - 1.8 * vel + 26 * Math.sin(t / 160)) * dt;
+    ang = Math.max(-55, Math.min(55, ang + vel * dt));
+    pinata.style.transform = `rotate(${ang.toFixed(2)}deg)`;
+    raf = requestAnimationFrame(swing);
+  };
+  const stopSwing = () => cancelAnimationFrame(raf);
+
   let hits = 0;
   let last = 0;
-  const hit = () => {
+  const hit = (dir) => {
     if (hits >= HITS) return;
     hits++;
+    vel += dir * (170 + Math.random() * 60);
     bar.style.width = `${(hits / HITS) * 100}%`;
     pinata.classList.remove("is-hit");
     void pinata.offsetWidth;
@@ -1549,52 +1463,76 @@ function pinataPage(gift) {
     if (hits < HITS) return;
     // se rompe: explota y cae el regalo
     removeEventListener("devicemotion", onMotion);
-    setTimeout(() => {
+    setTimeout(async () => {
+      stopSwing();
+      const rb = pinata.getBoundingClientRect();
       window.Pixel?.sfx("power");
-      confetti.burst(r.left + r.width / 2, r.top + r.height / 2, 200);
+      confetti.burst(rb.left + rb.width / 2, rb.top + rb.height / 2, 200);
       pinata.classList.add("is-broken");
-      setTimeout(() => {
-        pinata.hidden = true;
-        present.hidden = false;
-        present.classList.add("is-falling");
-        window.Pixel?.sfx("hit");
-        title.textContent = "¿Y eso?";
-        text.textContent = "";
-        buddy.say("¿Qué es eso que cayó?", "surprised", 2200);
-        setTimeout(() => buddy.say("¡Ah! Es tu regalo.", "love", 3500), 2600);
-      }, 450);
+      await sleep(350);
+      pinata.hidden = true;
+      present.hidden = false;
+      present.classList.add("is-falling");
+      title.textContent = "¿Y eso?";
+      text.textContent = "";
+      await sleep(570); // toca el piso
+      window.Pixel?.sfx("hit");
+      vibrate(40);
+      await sleep(600);
+      buddy.say("¿Qué es eso que cayó?", "surprised", 2000);
+      await sleep(2100);
+      buddy.say("¡Ah! Es tu regalo.", "love", 3000);
+      // se abre sola y asoma la entrada
+      present.classList.remove("is-falling");
+      present.classList.add("is-open");
+      save({ pinata: true });
+      window.Pixel?.sfx("coin");
+      const rp = present.getBoundingClientRect();
+      confetti.burst(rp.left + rp.width / 2, rp.top, 160);
+      vibrate([30, 40, 90]);
+      title.textContent = "¡Tu regalo!";
+      setReady(page);
+      await sleep(2200);
+      if (book.pages[book.index] === page) turnTo(book.index + 1);
     }, 250);
   };
-  pinata.addEventListener("click", hit);
-  // si el celular tiene sensor (y no pide permiso), sacudirlo también le pega
+  // tocarla: el golpe la empuja hacia el lado contrario
+  pinata.addEventListener("click", (e) => {
+    const r = pinata.getBoundingClientRect();
+    hit(e.clientX && e.clientX < r.left + r.width / 2 ? -1 : 1);
+  });
+
+  // sacudir el celular: un tirón fuerte cuenta como golpe
   const onMotion = (e) => {
-    const a = e.accelerationIncludingGravity || e.acceleration;
-    if (!a) return;
+    const a = e.acceleration;
+    const g = e.accelerationIncludingGravity;
+    let force;
+    if (a && a.x != null) force = Math.hypot(a.x, a.y || 0, a.z || 0);
+    else if (g && g.x != null) force = Math.abs(Math.hypot(g.x, g.y || 0, g.z || 0) - 9.8);
+    else return;
     const now = performance.now();
-    if (Math.abs(a.x || 0) + Math.abs(a.y || 0) + Math.abs(a.z || 0) > 34 && now - last > 350) {
+    if (force > 13 && now - last > 300) {
       last = now;
-      hit();
+      hit((g?.x ?? a?.x ?? 1) > 0 ? 1 : -1);
     }
   };
-  present.addEventListener("click", async () => {
-    if (state.pinata) return;
-    save({ pinata: true });
-    present.classList.remove("is-falling");
-    present.classList.add("is-open");
-    window.Pixel?.sfx("coin");
-    const r = present.getBoundingClientRect();
-    confetti.burst(r.left + r.width / 2, r.top, 160);
-    vibrate([30, 40, 90]);
-    title.textContent = "¡Tu regalo!";
-    setReady(page);
-    await sleep(1300);
-    turnTo(book.index + 1); // y aparece la entrada para raspar
-  });
-  page.onEnter = () => {
-    buddy.say("¡Pegale a la piñata!", "happy");
-    if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission !== "function") {
-      addEventListener("devicemotion", onMotion);
+  let motionOn = false;
+  const enableMotion = async () => {
+    if (motionOn || typeof DeviceMotionEvent === "undefined") return;
+    motionOn = true;
+    // en iPhone hay que pedir permiso con un toque; en Android anda directo
+    if (typeof DeviceMotionEvent.requestPermission === "function") {
+      try {
+        if ((await DeviceMotionEvent.requestPermission()) !== "granted") return;
+      } catch { motionOn = false; return; }
     }
+    addEventListener("devicemotion", onMotion);
+  };
+  page.el.addEventListener("pointerdown", enableMotion);
+  page.onEnter = () => {
+    buddy.say("¡Sacudí el celu para pegarle!", "happy", 3500);
+    if (!raf && hits < HITS) raf = requestAnimationFrame(swing);
+    if (typeof DeviceMotionEvent?.requestPermission !== "function") enableMotion();
   };
   return page;
 }

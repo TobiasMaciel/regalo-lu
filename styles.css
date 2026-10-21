@@ -499,21 +499,6 @@ body::after {
     radial-gradient(circle 7px at calc(100% - var(--stub)) 0, #0000 97%, #000) top / 100% 51% no-repeat,
     radial-gradient(circle 7px at calc(100% - var(--stub)) 100%, #0000 97%, #000) bottom / 100% 51% no-repeat;
 }
-/* hasta que la lámina está pintada, la entrada no se ve */
-.ticket-wrap.is-covered { background: linear-gradient(135deg, #b48c3c, #ead199 30%, #c49b4b 55%, #f0dcaa 80%, #a88130); }
-.ticket-wrap.is-covered .ticket { visibility: hidden; }
-
-.scratch {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  touch-action: none;
-  cursor: grab;
-  transition: opacity .7s ease;
-}
-.scratch.is-clearing { opacity: 0; pointer-events: none; }
-
 /* Entrada de show clásica: cartulina impresa + talón troquelado */
 .ticket {
   position: relative;
@@ -1086,16 +1071,17 @@ body::after {
 @keyframes twinkle { 0%, 88%, 100% { transform: rotate(-14deg) scale(1); } 94% { transform: rotate(-14deg) scale(1.18); filter: brightness(1.12); } }
 @keyframes heart-hint { 50% { transform: rotate(-14deg) scale(1.6); opacity: 1; } }
 .detail__heart.is-found span {
-  animation: px-pop .4s steps(3);
+  animation: none;
   opacity: 1;
-  transform: rotate(0) scale(1.25);
+  transform: none;
 }
-.detail__heart.is-found::after { /* recuadro pixel que se cierra sobre el corazón */
+.detail__heart.is-found::after { /* recuadro pixel que se cierra alrededor del corazón, sin tocarlo */
   content: "";
   position: absolute;
-  inset: 3px;
+  inset: -5px;
   border: 3px solid var(--pen);
-  box-shadow: 0 0 0 2px #fff;
+  box-shadow: 0 0 0 2px #fff, inset 0 0 0 2px #fff;
+  pointer-events: none;
   animation: found-ring .5s steps(4) both;
 }
 @keyframes found-ring { from { transform: scale(2.4); opacity: 0; } }
@@ -1550,7 +1536,7 @@ body::before {
 }
 .guess__reply { font: 500 17px/1.3 var(--serif); }
 .detail__frame { box-shadow: 0 0 0 3px #242322, var(--hard); transform: rotate(-1deg); }
-.detail__heart span { font-size: 0; text-shadow: none; filter: drop-shadow(0 0 1px rgba(255, 255, 255, .8)); }
+.detail__heart span { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 0; line-height: 0; text-shadow: none; filter: drop-shadow(0 0 1px rgba(255, 255, 255, .8)); }
 
 /* la lata en pixel art */
 .can-wrap { width: 98px; height: 172px; }
@@ -1584,16 +1570,69 @@ body::before {
   clip-path: polygon(50% 100%, 0 0, 100% 0);
 }
 
-/* ───── la entrada ───── */
-.ticket-wrap { border-radius: 0; box-shadow: 0 0 0 3px #242322, var(--hard); }
-.ticket__top { font: 400 13px/1 var(--mono); }
-.ticket__artist { font: 400 36px/.9 var(--mono); letter-spacing: 0; }
-.ticket__tour { font: 400 14px/1.1 var(--mono); }
-.ticket__when { font: 400 22px/1 var(--mono); }
-.ticket__rows { font: 400 14px/1.15 var(--mono); }
-.ticket__admit { font: 400 12px/1 var(--mono); }
-.ticket__qty { font: 400 44px/1 var(--mono); }
-.ticket__code { font: 400 12px/1 var(--mono); }
+/* ───── la entrada, en pixel art ───── */
+.ticket-wrap {
+  border-radius: 0;
+  overflow: visible;
+  -webkit-mask: none;
+  mask: none;
+  box-shadow: 0 0 0 3px #242322, 0 0 0 6px #f2c94c, 0 0 0 9px #242322, 7px 7px 0 9px rgba(36, 35, 34, .25);
+}
+.ticket {
+  background:
+    conic-gradient(rgba(194, 69, 107, .07) 25%, transparent 0 50%, rgba(194, 69, 107, .07) 0 75%, transparent 0) 0 0 / 8px 8px,
+    #fbf3df;
+}
+.ticket::after { background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, .75) 40% 48%, transparent 48% 52%, rgba(255, 255, 255, .5) 52% 55%, transparent 55%); }
+.ticket__main {
+  padding: 0 12px 12px 18px;
+  border-left: 0;
+  background: repeating-linear-gradient(180deg, var(--pen) 0 8px, #e0548c 8px 16px) left / 8px 100% no-repeat;
+}
+.ticket__top {
+  margin: 0 -12px 0 -18px;
+  padding: 6px 12px 5px 46px;
+  background: #242322;
+  color: #f2c94c;
+  font: 400 15px/1 var(--mono);
+  letter-spacing: .18em;
+}
+.ticket__artist {
+  margin: 10px 0 2px;
+  font: 700 30px/.95 "Pixelify Sans", var(--mono);
+  letter-spacing: .02em;
+  color: var(--pen);
+  text-shadow: 3px 3px 0 #242322;
+}
+.ticket__tour { font: 400 15px/1.1 var(--mono); color: #4e4a44; }
+.ticket__when {
+  padding: 6px 0;
+  border-top: 3px solid #242322;
+  border-bottom: 3px solid #242322;
+  font: 400 23px/1 var(--mono);
+}
+.ticket__rows { font: 400 15px/1.1 var(--mono); }
+.ticket__rows dt { color: var(--pen); }
+.ticket__rows dd { font-weight: 400; }
+.ticket__stub {
+  padding: 0 4px 10px;
+  background:
+    conic-gradient(rgba(36, 35, 34, .07) 25%, transparent 0 50%, rgba(36, 35, 34, .07) 0 75%, transparent 0) 0 0 / 8px 8px,
+    #f2c94c;
+}
+.ticket__stub::before { /* troquel de puntitos cuadrados */
+  top: 0;
+  bottom: 0;
+  left: -2px;
+  width: 4px;
+  border: 0;
+  background: repeating-linear-gradient(180deg, #242322 0 4px, transparent 4px 9px);
+}
+.ticket__star { display: flex; justify-content: center; width: calc(100% + 8px); margin: 0 -4px; padding: 6px 0 5px; background: #242322; line-height: 0; }
+.ticket__admit { font: 400 14px/1 var(--mono); color: #242322; }
+.ticket__qty { font: 700 46px/1 "Pixelify Sans", var(--mono); color: var(--pen); text-shadow: 3px 3px 0 #242322; }
+.ticket__code { font: 400 13px/1 var(--mono); color: #242322; }
+.ticket__barcode { shape-rendering: crispEdges; }
 
 /* ───── ¿vamos? y cuenta regresiva ───── */
 .question__text { font: 700 52px/1 var(--serif); color: var(--pen); text-shadow: 4px 4px 0 #242322; }
@@ -1790,9 +1829,20 @@ body::before {
 .word__icon { margin: 26px 0 30px; line-height: 0; animation: can-bob 1.4s steps(2) infinite; }
 .word__icon.is-done { animation: px-pop .5s steps(4); }
 
-/* la piñata */
+/* la piñata: se balancea como péndulo (lo mueve app.js, cuadro a cuadro) */
 .page--pinata .page__body { align-items: center; justify-content: center; text-align: center; }
-.pinata-stage { position: relative; width: 100%; height: 230px; margin: 4px 0 14px; }
+.pinata-stage { position: relative; width: 100%; height: 240px; margin: 22px 0 14px; }
+.pinata-stage::before { /* el palo de donde cuelga */
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  width: 120px;
+  height: 6px;
+  margin-left: -60px;
+  background: #8b6342;
+  box-shadow: 0 0 0 2px #242322;
+}
 .pinata {
   position: absolute;
   left: 50%;
@@ -1804,47 +1854,56 @@ body::before {
   background: none;
   cursor: pointer;
   transform-origin: 50% 0;
-  animation: swing 2.4s ease-in-out infinite;
+  will-change: transform;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
-.pinata__rope { display: block; width: 3px; height: 70px; margin: 0 auto; background: #8b6342; box-shadow: 1px 0 0 #6e4b30; }
-.pinata__body { display: block; line-height: 0; }
-@keyframes swing { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
-.pinata.is-hit { animation: hit-swing .5s steps(5), swing 2.4s .5s ease-in-out infinite; }
-@keyframes hit-swing {
-  20% { transform: rotate(-22deg) scale(.95, 1.05); }
-  50% { transform: rotate(16deg); }
-  80% { transform: rotate(-6deg); }
+/* el hilo baja hasta el lomo del burrito (fila 5 del dibujo = 30 px) */
+.pinata__rope { display: block; position: relative; z-index: 0; width: 3px; height: 70px; margin: 0 auto; background: #8b6342; box-shadow: 1px 0 0 #6e4b30; }
+.pinata__body { display: block; position: relative; z-index: 1; margin-top: -30px; line-height: 0; transform-origin: 50% 30px; }
+.pinata.is-hit .pinata__body { animation: pinata-squash .32s ease-out; }
+@keyframes pinata-squash {
+  30% { transform: scale(1.1, .88); }
+  65% { transform: scale(.96, 1.05); }
 }
-.pinata.is-broken { animation: pop-out .4s steps(4) forwards; }
-@keyframes pop-out { to { transform: scale(1.6); opacity: 0; } }
+.pinata.is-broken { animation: pop-out .35s ease-in forwards; }
+@keyframes pop-out { to { transform: scale(1.5); opacity: 0; } }
+
+/* el regalo que cae, rebota y se abre solo */
 .gift-drop {
   position: absolute;
   left: 50%;
-  bottom: 10px;
+  bottom: 6px;
   width: 98px;
   margin-left: -49px;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
   line-height: 0;
+  transform-origin: 50% 100%;
 }
-.gift-drop__lid, .gift-drop__base { display: block; transition: transform .4s steps(4); }
-.gift-drop__tap {
-  display: block;
-  margin-top: 10px;
-  font: 600 13px/1 var(--serif);
-  letter-spacing: .12em;
-  color: var(--pen);
-  animation: blink-text 1s steps(1) infinite;
+.gift-drop__lid, .gift-drop__base { display: block; position: relative; }
+.gift-drop__lid { z-index: 1; transition: transform .55s cubic-bezier(.2, 1.4, .4, 1); }
+.gift-drop__base { z-index: 3; }
+.gift-drop__ticket { /* la entrada adentro de la caja */
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: 12px;
+  margin-left: -42px;
+  opacity: 0;
+  transform: translateY(0);
+  transition: transform .8s .25s cubic-bezier(.2, 1.3, .4, 1), opacity .2s .25s;
 }
-.gift-drop.is-falling { animation: drop .7s cubic-bezier(.5, 0, .7, .4) both, wiggle 1.6s .9s steps(4) infinite; }
-@keyframes drop { from { transform: translateY(-190px); } 80% { transform: translateY(6px); } }
-@keyframes wiggle { 0%, 70%, 100% { transform: none; } 80% { transform: rotate(-6deg); } 90% { transform: rotate(6deg); } }
-.gift-drop.is-open { animation: none; }
-.gift-drop.is-open .gift-drop__lid { transform: translate(18px, -46px) rotate(18deg); }
-.gift-drop.is-open .gift-drop__tap { visibility: hidden; }
+.gift-drop.is-falling { animation: drop 1.1s both; }
+@keyframes drop {
+  0% { transform: translateY(-190px); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  52% { transform: translateY(0) scale(1.14, .84); animation-timing-function: cubic-bezier(0, .55, .45, 1); }
+  68% { transform: translateY(-28px) scale(.95, 1.05); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  80% { transform: translateY(0) scale(1.07, .93); animation-timing-function: cubic-bezier(0, .55, .45, 1); }
+  89% { transform: translateY(-8px); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  100% { transform: translateY(0); }
+}
+.gift-drop.is-open .gift-drop__lid { transform: translate(78px, 14px) rotate(38deg); }
+.gift-drop.is-open .gift-drop__ticket { opacity: 1; transform: translateY(-62px) rotate(-6deg); animation: ticket-glow 1.2s 1s ease-in-out infinite; }
+@keyframes ticket-glow { 50% { filter: drop-shadow(0 0 6px #f2c94c) brightness(1.08); } }
 
 /* ───────── En el celular: sin efectos pesados (evita parpadeos) ───────── */
 @media (hover: none) {
