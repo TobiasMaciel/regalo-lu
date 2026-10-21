@@ -641,6 +641,65 @@
 
   /* ───────── íconos en pixel art (modo juego) ───────── */
   var ICONS = {
+    // pistas de la búsqueda de palabras: la compu, el baño y Snoopy
+    laptop: {
+      rows: [
+        "..oooooooooooooooo..",
+        "..oSSSSSSSSSSSSSSo..",
+        "..oSBBBBBBBBBBBBSo..",
+        "..oSBbbbbBBBBBBBSo..",
+        "..oSBBBBBbbbBBBBSo..",
+        "..oSBbbBBBBBBBBBSo..",
+        "..oSBBBBBBBBBBBBSo..",
+        "..oSBBBBBBBBBBBBSo..",
+        "..oSSSSSSSSSSSSSSo..",
+        "..oooooooooooooooo..",
+        "oooooooooooooooooooo",
+        "oKKKKKKKKKKKKKKKKKKo",
+        "oKkKkKkKkKkKkKkKkKKo",
+        ".oooooooooooooooooo."
+      ],
+      pal: { o: "#242322", S: "#9a9a9a", B: "#2f3a6b", b: "#7fd0e8", K: "#c9c9c9", k: "#8a8a8a" }
+    },
+    toilet: {
+      rows: [
+        "..oooooooo....",
+        "..oWWWWWWo....",
+        "..oWWWWWWo....",
+        "..oWWWWWWo....",
+        "..oooooooo....",
+        "...oWWWWo.....",
+        "oooooooooooo..",
+        "oWWWWWWWWWWWo.",
+        "oWbbbbbbbbbWo.",
+        "oWbbbbbbbbbWo.",
+        ".oWWWWWWWWWo..",
+        "..oWWWWWWWo...",
+        "...oWWWWWo....",
+        "...oWWWWWo....",
+        "..ooooooooo..."
+      ],
+      pal: { o: "#242322", W: "#f4f4f4", b: "#7fd0e8" }
+    },
+    snoopy: {
+      rows: [
+        "......oooooo......",
+        "....ooWWWWWWoo....",
+        "...oWWWWWWWWWWo...",
+        "..oWWWWWWWWWWWWo..",
+        ".oKKWWWWWWWWWWWWo.",
+        "oKKKKWWWWoWWWWWWo.",
+        "oKKKKWWWWWWWWWWWWo",
+        "oKKKKWWWWWWWWWWWKo",
+        "oKKKKWWWWWWWWWWKKo",
+        ".oKKKWWWWWWWWWWWo.",
+        ".oKKWWWWWWoooWWo..",
+        "..oKoWWWWWWWWWo...",
+        "...o.oWWWWWWWo....",
+        "......ooooooo....."
+      ],
+      pal: { o: "#242322", W: "#ffffff", K: "#242322" }
+    },
     // la lata (cuerpo y tapa por separado, para que la tapa pueda salir volando)
     canBody: {
       rows: [

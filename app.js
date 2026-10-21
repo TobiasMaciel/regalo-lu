@@ -392,8 +392,8 @@ function buildBook(gift, restoring) {
 
   const pages = [
     letterPage(gift, letterFrames, restoring),
-    runnerPage(gift),
     gift.numero?.codigo ? numberPage(gift, numberFrames) : null,
+    runnerPage(gift),
     gift.misiones?.invisible ? missionPage(gift.misiones.invisible, "invisible") : null,
     gift.detalle ? detailPage(gift, photos) : null,
     gift.misiones?.escondite ? missionPage(gift.misiones.escondite, "escondite") : null,
@@ -1971,41 +1971,87 @@ const confetti = (() => {
 
 /* ───────── El personajito y la búsqueda de QRs ───────── */
 
-// Cada QR lleva a ?q=…: uno solo abre el cuaderno; los demás son señuelos. Sin ?q (el QR de la carta) es el inicio del juego.
-const QR_CORRECTO = "a4k9";
+// La bienvenida: el QR de atrás de la carta abre esto; después viene el cuaderno
 const ESCENAS = {
-  // atrás de la carta
   inicio: [
     "?¡Hola, Lu!",
     "Soy yo… bueno, una versión mía en píxeles.",
     "!Te preparé algo.",
     "Pensaste que era solo una carta, ¿no?",
     "Pero no te la voy a hacer tan fácil.",
-    "Escondí varios códigos QR por la casa.",
-    "Uno está donde paso horas con la compu…",
-    "otro, cerca de donde mirás series…",
-    "y otro lo cuida alguien que te regalé.",
-    "Solo uno es el correcto.",
-    "Cuando encuentres uno, escanealo con la cámara del celular.",
+    "Dentro de tu pieza escondí algunas palabras.",
+    "Vas a tener que encontrarlas.",
+    "Cada una te lleva a la siguiente.",
     "!¡Empecemos!",
   ],
-  // el QR que tiene Snoopy
-  correcto: [
-    "?¡Eh! ¿Cómo llegaste hasta acá?",
-    "!Snoopy te lo cuidó bien.",
-    "Bueno… creo que estás en el lugar correcto.",
-    "Pero esto recién empieza.",
-    "Para abrir el cuaderno vas a necesitar una palabra.",
-    "Está escondida en algún lado de la carta…",
-    "!Mirá bien.",
-  ],
-  señuelos: {
-    m2x7: ["?¿En la compu?", "Muy de programador… pero no.", "Este no es. Seguí buscando."], // compu
-    t8p3: ["!¡Ja! ¿Pensaste que estaba en la tele?", "Este tampoco es.", "Pista: buscá a alguien blanco y negro…"], // tele
-    w5r1: ["?Mmm… este no es.", "Seguí buscando."], // de repuesto
-  },
-  señueloGenerico: ["?Mmm… este no es.", "Seguí buscando."],
 };
+
+/* ───────── Búsqueda de palabras (antes del candado) ───────── */
+
+// Cada pista es solo una imagen: la compu, el baño y Snoopy. Las palabras no están en el código:
+// se comparan por su huella (SHA-256), así no se pueden espiar.
+const PALABRAS = [
+  { icono: "laptop", largo: 9, huella: "2f52026cd52dd911992e55ec8d3b20db79c6aadfa2ea6b5b9163fa481eb18d1a", pista: "Donde paso horas…", dice: "La primera palabra está escondida acá:" },
+  { icono: "toilet", largo: 8, huella: "d0177aafe46113976e5de3d9b046dd334ca50afb626ca08b85fa1e01b5e759f6", pista: "Donde te lavás los dientes…", dice: "¡Bien! La siguiente está acá:" },
+  { icono: "snoopy", largo: 4, huella: "028f9e382a4b60276de62e97564b261b1ec61bc340857a5331de0a5efb03325c", pista: "Lo cuida alguien que te regalé.", dice: "¡Una más! Buscala acá:" },
+];
+const PALABRAS_KEY = "regalo-lu:palabras";
+const palabrasHechas = () => { try { return Number(sessionStorage.getItem(PALABRAS_KEY)) || 0; } catch { return 0; } };
+
+async function huella(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`regalo-lu:${text}`));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Arma las 3 hojas entre la carta de la portada y el candado; devuelve una función que arranca la búsqueda
+function buildWordHunt() {
+  const done = palabrasHechas();
+  const pages = PALABRAS.map((p, i) => {
+    const field = codeField(p.largo, false);
+    const msg = el("p", { class: "code__msg", role: "status", "aria-live": "polite" });
+    const hint = el("p", { class: "lock__hint", text: p.pista, hidden: true });
+    const hintBtn = el("button", { class: "hint-btn", type: "button", text: "¿Pista?" });
+    hintBtn.addEventListener("click", () => { hint.hidden = !hint.hidden; });
+    const icon = el("div", { class: "word__icon" }, window.Pixel?.icon(p.icono, { scale: 8 }).el ?? null);
+    const section = el("section", { class: "notebook page page--word", "aria-label": `Palabra ${i + 1}` },
+      el("p", { class: "mission__tag", text: `PALABRA ${i + 1}/${PALABRAS.length}` }),
+      icon, field.el, msg, hintBtn, hint);
+    let tries = 0;
+    field.onComplete = async (v) => {
+      if ((await huella(v)) === p.huella) {
+        field.input.blur();
+        field.input.disabled = true;
+        field.tilesBox.classList.add("is-ok");
+        icon.classList.add("is-done");
+        window.Pixel?.sfx("coin");
+        const r = icon.getBoundingClientRect();
+        confetti.burst(r.left + r.width / 2, r.top + r.height / 2, 120);
+        vibrate([30, 40, 90]);
+        try { sessionStorage.setItem(PALABRAS_KEY, String(i + 1)); } catch {}
+        await sleep(1300);
+        window.Pixel?.sfx("page");
+        await turnAway(section);
+        if (i + 1 < PALABRAS.length) buddy.say(PALABRAS[i + 1].dice, "happy", 4000);
+        else buddy.say("¡Las encontraste todas! Ahora, la última: está en la carta…", "happy", 5000);
+        return;
+      }
+      msg.textContent = ["Esa no es.", "Tampoco… mirá bien.", "Casi. Probá de nuevo."][tries++ % 3];
+      window.Pixel?.sfx("error");
+      field.tilesBox.classList.remove("is-error");
+      void field.tilesBox.offsetWidth;
+      field.tilesBox.classList.add("is-error");
+      vibrate([60, 40, 60]);
+      setTimeout(() => { field.set(""); field.input.focus(); }, 650);
+    };
+    if (i < done) section.classList.add("is-turned", "is-gone");
+    return section;
+  });
+  // en el DOM, antes = más abajo: candado, palabra 3, palabra 2, palabra 1, carta de la portada
+  const intro = $("#page-intro");
+  [...pages].reverse().forEach((section) => bookEl.insertBefore(section, intro));
+  return () => buddy.say(done < PALABRAS.length ? PALABRAS[done].dice : "La última palabra está escondida en la carta…", "normal", 4000);
+}
+
 const FIN_ESCENA = {
   inicio: ["MISIÓN", "Encontrá el QR correcto", "Buscá los QR escondidos y escanealos con la cámara del celular. Esta página ya la podés cerrar."],
   señuelo: ["¿CONTINUAR?", "Escaneá otro QR", "Seguí buscando: el correcto está escondido en otro lado."],
@@ -2018,7 +2064,7 @@ async function runScene(kind, lines) {
   scene.hidden = false;
   const sprite = window.Pixel?.sprite("tobi", { scale: 7 });
   sprite?.setMood("sleep"); // arranca dormido y se despierta al tocar "empezar"
-  const start = el("button", { class: "scene__start", type: "button", text: { inicio: "▶ EMPEZAR JUEGO", señuelo: "▶ CONTINUAR", correcto: "▶ CONTINUAR" }[kind] });
+  const start = el("button", { class: "scene__start", type: "button", text: { inicio: "▶ EMPEZAR JUEGO", señuelo: "▶ CONTINUAR", correcto: "▶ EMPEZAR JUEGO" }[kind] });
   const dialogBox = el("div", { class: "scene__dialog" });
   const end = el("div", { class: "scene__end", hidden: true });
   scene.replaceChildren(el("div", { class: "scene__inner" },
@@ -2125,12 +2171,8 @@ const ready = Promise.race([document.fonts.ready, sleep(2000)]).then(() => {
   document.documentElement.classList.remove("is-loading");
 });
 
-const q = new URLSearchParams(location.search).get("q");
 const saved = store.get();
-if (q !== QR_CORRECTO) {
-  // QR de la carta (sin ?q) o un señuelo: solo el personajito, el cuaderno no aparece
-  ready.then(() => (q ? runScene("señuelo", ESCENAS.señuelos[q] ?? ESCENAS.señueloGenerico) : runScene("inicio", ESCENAS.inicio)));
-} else if (saved?.gift) {
+if (saved?.gift) {
   // recarga: el cuaderno se rearma ya abierto en la hoja donde estaba
   state = saved;
   buddy.show();
@@ -2163,14 +2205,15 @@ if (q !== QR_CORRECTO) {
     turnAway(intro);
   };
   intro.addEventListener("click", turnIntro);
+  const startHunt = buildWordHunt();
   ready
-    .then(() => runScene("correcto", ESCENAS.correcto))
+    .then(() => runScene("correcto", ESCENAS.inicio))
     .then(() => {
       buddy.show();
       return sleep(2600);
     })
     .then(turnIntro)
-    .then(() => sleep(1600))
-    .then(() => { if (!state) buddy.say("La palabra está escondida en la carta…"); });
+    .then(() => sleep(1400))
+    .then(startHunt);
 }
 })();

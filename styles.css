@@ -1778,6 +1778,11 @@ body::before {
 .page.is-current:not(.is-seen) .show__duo { animation: rise-in 1s .6s var(--ease-out) both; }
 .final__song { margin-top: 10px; }
 
+/* búsqueda de palabras: la pista es solo una imagen */
+.page--word { align-items: center; justify-content: center; text-align: center; padding-bottom: 34px; }
+.word__icon { margin: 26px 0 30px; line-height: 0; animation: can-bob 1.4s steps(2) infinite; }
+.word__icon.is-done { animation: px-pop .5s steps(4); }
+
 /* ───────── En el celular: sin efectos pesados (evita parpadeos) ───────── */
 @media (hover: none) {
   /* el cuaderno solo se escala: sin perspectiva permanente (en Safari hace parpadear las hojas) */
