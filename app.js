@@ -1555,6 +1555,8 @@ const ESCENAS = {
     "Pero no te la voy a hacer tan fácil.",
     "En algún lugar hay un código QR que te lleva a tu regalo.",
     "Hay varios… pero uno solo es el correcto.",
+    "Están escondidos por ahí: en tu pieza, en lo que te regalé…",
+    "Cuando encuentres uno, escanealo con la cámara del celular.",
     "!¡Empecemos la búsqueda!",
   ],
   correcto: [
@@ -1572,8 +1574,8 @@ const ESCENAS = {
   señueloGenerico: ["?Mmm… este no es.", "Seguí buscando."],
 };
 const FIN_ESCENA = {
-  inicio: ["MISIÓN", "Encontrá el QR correcto"],
-  señuelo: ["¿CONTINUAR?", "Escaneá otro QR"],
+  inicio: ["MISIÓN", "Encontrá el QR correcto", "Buscá los QR escondidos y escanealos con la cámara del celular. Esta página ya la podés cerrar."],
+  señuelo: ["¿CONTINUAR?", "Escaneá otro QR", "Seguí buscando: el correcto está escondido en otro lado."],
 };
 
 // Pantalla retro: "TOCÁ PARA EMPEZAR" (ese toque habilita el sonido) → el personajito habla → fin o cuaderno
@@ -1615,8 +1617,8 @@ async function runScene(kind, lines) {
     document.documentElement.classList.remove("is-scene");
     return;
   }
-  const [title, sub] = FIN_ESCENA[kind];
-  end.append(el("strong", { text: title }), el("span", { text: sub }));
+  const [title, sub, help] = FIN_ESCENA[kind];
+  end.append(el("strong", { text: title }), el("span", { text: sub }), el("small", { text: help }));
   end.hidden = false;
   sprite?.setMood(kind === "inicio" ? "happy" : "normal");
 }

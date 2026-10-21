@@ -1380,6 +1380,12 @@ body::after {
   animation: blink-text 1.2s steps(1) infinite;
 }
 .scene__end span { font-size: 18px; color: var(--ink-soft); }
+.scene__end small {
+  max-width: 30ch;
+  margin: 14px auto 0;
+  font: 400 15px/1.4 "Pixelify Sans", "VT323", monospace;
+  color: var(--ink-faint);
+}
 
 /* ───────── El personajito que acompaña abajo del cuaderno ───────── */
 .has-buddy .stage { padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
